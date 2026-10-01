@@ -23,7 +23,7 @@ const params = new URLSearchParams(location.hash.slice(1));
 const NONCE = params.get('n');
 const SERVICE = params.get('svc') === 'Hulu' ? 'Hulu' : 'Netflix';
 // Events the content script may send to the room through this page.
-const PAGE_EVENTS = new Set(['cmd:play', 'cmd:pause', 'cmd:seek', 'buffering', 'drift', 'media:meta', 'countdown:start']);
+const PAGE_EVENTS = new Set(['cmd:play', 'cmd:pause', 'cmd:seek', 'buffering', 'drift', 'media:meta', 'countdown:start', 'ext:next']);
 
 const session = {
   get() { try { return JSON.parse(sessionStorage.getItem('couchline:session')); } catch { return null; } },
@@ -256,6 +256,7 @@ async function startCall() {
   const ok = await call.start();
   if (!ok) showToast({ text: 'Camera and mic are blocked. Allow them for this extension to join the call.' });
   renderCallButtons();
+  if (!$('#devicePanel').hidden) renderDevices();
 }
 function renderCallButtons() {
   $('#joinCallBtn').hidden = !!call?.active;
@@ -267,6 +268,43 @@ $('#joinCallBtn').addEventListener('click', startCall);
 $('#leaveCallBtn').addEventListener('click', () => { call.leave(); renderCallButtons(); });
 $('#micBtn').addEventListener('click', (e) => { e.target.textContent = call.toggleMic() ? 'Mute' : 'Unmute'; });
 $('#camBtn').addEventListener('click', (e) => { e.target.textContent = call.toggleCam() ? 'Camera off' : 'Camera on'; });
+
+// Tap a face to make it bigger; double tap for full screen.
+$('#tiles').addEventListener('click', (e) => {
+  const tile = e.target.closest('.tile');
+  if (!tile) return;
+  const big = !tile.classList.contains('is-big');
+  for (const t of $('#tiles').children) t.classList.remove('is-big');
+  tile.classList.toggle('is-big', big);
+});
+$('#tiles').addEventListener('dblclick', (e) => e.target.closest('.tile')?.querySelector('video')?.requestFullscreen?.().catch(() => {}));
+
+// Camera, microphone, and speaker, the same choices as in the web app (from call.js).
+async function renderDevices() {
+  if (!call) return;
+  const { cameras, mics, speakers, chosen } = await call.listDevices();
+  const fill = (sel, list, current, fallback) => {
+    sel.replaceChildren(...list.map((d, i) => el('option', { value: d.deviceId, selected: d.deviceId === current }, d.label || `${fallback} ${i + 1}`)));
+    sel.disabled = !list.length;
+  };
+  fill($('#camSelect'), cameras, chosen.camera, 'Camera');
+  fill($('#micSelect'), mics, chosen.mic, 'Microphone');
+  fill($('#speakerSelect'), speakers, chosen.speaker, 'Speaker');
+  $('#speakerField').hidden = !speakers.length;
+  $('#deviceNote').textContent = [...cameras, ...mics].some((d) => !d.label) ? 'Join the call once to see device names.' : '';
+}
+$('#devicesBtn').addEventListener('click', () => {
+  const open = $('#devicePanel').hidden;
+  $('#devicePanel').hidden = !open;
+  $('#devicesBtn').setAttribute('aria-expanded', String(open));
+  if (open) renderDevices();
+});
+for (const [sel, kind] of [['#camSelect', 'camera'], ['#micSelect', 'mic'], ['#speakerSelect', 'speaker']]) {
+  $(sel).addEventListener('change', async (e) => {
+    if (!(await call?.useDevice(kind, e.target.value))) showToast({ text: 'That device couldn’t be used. It may be busy in another app.' });
+    renderCallButtons();
+  });
+}
 
 $('#reactions').append(...REACTIONS.map((emoji) => el('button', {
   class: 'react-btn', 'aria-label': `React ${emoji}`, onclick: () => socket?.emit('react', { emoji }),

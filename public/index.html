@@ -27,10 +27,12 @@
       <p class="lede">Watch together from two places. YouTube, Vimeo, Twitch, and your own video links stay in sync on their own. Netflix and Hulu sync with the Couchline extension, or start on a shared countdown.</p>
       <div class="landing-actions">
         <button id="createRoom" class="btn btn-primary btn-big">Start a room</button>
-        <form id="joinCode" class="inline-form">
-          <label for="code" class="sr">Room code</label>
-          <input id="code" placeholder="Have a code? Type it" autocomplete="off" autocapitalize="off" spellcheck="false">
-          <button class="btn">Join</button>
+        <form id="joinCode" class="join-code">
+          <label for="code" class="join-label">Have a room code?</label>
+          <div class="inline-form">
+            <input id="code" placeholder="cozy-lamp-1234" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <button class="btn">Join</button>
+          </div>
         </form>
       </div>
     </div>
@@ -54,6 +56,24 @@
     <header class="topbar">
       <a href="/" class="brand">Couchline</a>
       <ul id="roster" class="roster" aria-label="In the room"></ul>
+      <div class="room-wrap">
+        <button id="roomChip" class="room-chip" aria-expanded="false" aria-controls="roomMenu">Room <strong id="roomCodeTop"></strong></button>
+        <div id="roomMenu" class="room-menu" hidden>
+          <p class="room-menu-label">Room code</p>
+          <p id="roomMenuCode" class="room-menu-code"></p>
+          <p class="hint">Anyone with this code or link can join.</p>
+          <div class="room-menu-row">
+            <button id="copyCode" class="btn btn-small">Copy code</button>
+            <button id="copyLink" class="btn btn-small">Copy link</button>
+          </div>
+          <form id="switchRoom" class="room-menu-row">
+            <label for="switchCode" class="sr">Another room code</label>
+            <input id="switchCode" placeholder="Join another room" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <button class="btn btn-small">Join</button>
+          </form>
+          <a href="/" class="btn btn-quiet btn-small">Leave room</a>
+        </div>
+      </div>
       <button id="share" class="btn btn-quiet btn-small">Invite</button>
     </header>
 
@@ -61,8 +81,10 @@
       <div class="main">
         <div id="stage" class="stage">
           <div id="emptyStage" class="empty-stage">
+            <p class="empty-code">Room code <strong id="emptyCode"></strong></p>
+            <p class="hint">Send it to whoever you’re watching with, or tap Invite. They can type it on the Couchline home page.</p>
             <p class="empty-title">Nothing’s on yet</p>
-            <p class="hint">Paste a YouTube, Vimeo, Twitch, or video link, or type a show name.</p>
+            <p class="hint">Add something in Up next: a link, a file from your device, or a show name.</p>
           </div>
 
           <div id="playerWrap" class="fill" hidden>
@@ -70,6 +92,15 @@
             <button id="tapShield" class="tap-shield" aria-label="Play or pause"></button>
             <p id="tapToStart" class="tap-banner" hidden>Tap the video once to start it on this device.</p>
             <p id="playerNote" class="player-note" hidden role="status"></p>
+            <div id="localCard" class="local-card" hidden>
+              <p class="stream-service">A video file from someone’s device</p>
+              <h2 id="localName" class="local-name"></h2>
+              <p id="localMeta" class="stream-ep"></p>
+              <p id="localHint" class="hint">Pick your own copy, or get it straight from someone who has it. It goes browser to browser; nothing is uploaded.</p>
+              <div id="localActions" class="local-actions"></div>
+              <div id="localProgress" class="progress" hidden><span></span></div>
+              <p id="localStatus" class="hint" role="status"></p>
+            </div>
           </div>
 
           <div id="remotePoster" class="fill remote-poster" hidden>
@@ -121,14 +152,33 @@
 
         <div class="reactions" id="reactions" aria-label="Send a reaction"></div>
 
-        <section id="call" class="call" aria-label="Video call">
-          <div id="tiles" class="tiles"></div>
+        <div class="call-bar">
           <div class="call-buttons">
             <button id="joinCallBtn" class="btn btn-small">Join call</button>
             <button id="micBtn" class="btn btn-small" hidden>Mute</button>
             <button id="camBtn" class="btn btn-small" hidden>Camera off</button>
+            <button id="devicesBtn" class="btn btn-small" aria-expanded="false" aria-controls="devicePanel">Camera and mic</button>
             <button id="leaveCallBtn" class="btn btn-quiet btn-small" hidden>Leave call</button>
           </div>
+          <div class="view-buttons">
+            <div class="seg" role="group" aria-label="Where the call goes">
+              <button data-layout="below" aria-pressed="true">Below</button>
+              <button data-layout="half" aria-pressed="false">Half</button>
+              <button data-layout="over" aria-pressed="false">Over video</button>
+            </div>
+            <button id="fullBtn" class="btn btn-small">Full screen</button>
+          </div>
+        </div>
+
+        <div id="devicePanel" class="device-panel" hidden>
+          <label class="field">Camera <select id="camSelect"></select></label>
+          <label class="field">Microphone <select id="micSelect"></select></label>
+          <label class="field" id="speakerField">Speaker <select id="speakerSelect"></select></label>
+          <p id="deviceNote" class="note"></p>
+        </div>
+
+        <section id="call" class="call" aria-label="Video call">
+          <div id="tiles" class="tiles" title="Tap someone to make them bigger. Double tap for full screen."></div>
         </section>
       </div>
 
@@ -139,15 +189,45 @@
         </div>
 
         <div id="tabNext" class="tab" role="tabpanel" aria-labelledby="tabNextBtn">
-          <form id="addForm" class="add-form">
-            <label for="addInput" class="sr">Link or show name</label>
-            <input id="addInput" placeholder="Paste a link or type a show" autocomplete="off" enterkeyhint="done">
-            <label for="addService" class="sr">Service</label>
-            <select id="addService" hidden><option>Netflix</option><option>Hulu</option><option>Other</option></select>
-            <button class="btn btn-primary">Add</button>
-          </form>
-          <p id="addError" class="error" hidden></p>
-          <div id="addNotes" class="add-notes" hidden aria-live="polite"></div>
+          <div class="add-modes" role="tablist" aria-label="What to add">
+            <button role="tab" id="modeLinkBtn" aria-selected="true" aria-controls="modeLink">Paste a link</button>
+            <button role="tab" id="modeFileBtn" aria-selected="false" aria-controls="modeFile">Pick a file</button>
+            <button role="tab" id="modeShowBtn" aria-selected="false" aria-controls="modeShow">Type a show</button>
+          </div>
+
+          <div id="modeLink" class="add-mode" role="tabpanel" aria-labelledby="modeLinkBtn">
+            <form id="addForm" class="add-form">
+              <label for="addInput" class="sr">Link</label>
+              <input id="addInput" placeholder="Paste a link" autocomplete="off" enterkeyhint="done">
+              <label for="addService" class="sr">Service</label>
+              <select id="addService" hidden><option>Netflix</option><option>Hulu</option><option>Other</option></select>
+              <button class="btn btn-primary">Add</button>
+            </form>
+            <div id="sourceChips" class="source-chips" aria-label="Where links can come from"></div>
+            <p id="sourceHelp" class="note" hidden></p>
+            <p id="addError" class="error" hidden></p>
+            <div id="addNotes" class="add-notes" hidden aria-live="polite"></div>
+          </div>
+
+          <div id="modeFile" class="add-mode" role="tabpanel" aria-labelledby="modeFileBtn" hidden>
+            <label class="btn btn-primary file-pick">Choose a video file
+              <input type="file" id="filePick" class="sr" accept="video/*,.mp4,.m4v,.mov,.webm,.mkv">
+            </label>
+            <p class="note">An .mp4 works everywhere. It plays from your device and nothing is uploaded. Everyone else picks their own copy, or gets it straight from you, browser to browser.</p>
+            <p id="fileStatus" class="note" role="status"></p>
+          </div>
+
+          <div id="modeShow" class="add-mode" role="tabpanel" aria-labelledby="modeShowBtn" hidden>
+            <form id="showAddForm" class="add-form">
+              <label for="showAddName" class="sr">Show or movie name</label>
+              <input id="showAddName" placeholder="Severance S2 E3" autocomplete="off" maxlength="120" required>
+              <label for="showAddService" class="sr">Service</label>
+              <select id="showAddService"><option>Netflix</option><option>Hulu</option><option>Other</option></select>
+              <button class="btn btn-primary">Add</button>
+            </form>
+            <p class="note">For something each of you opens on your own screen. You’ll start it together with a countdown.</p>
+          </div>
+
           <ol id="queue" class="queue"></ol>
         </div>
 

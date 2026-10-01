@@ -97,6 +97,60 @@ e.disconnect(); await wait(100);
 assert.equal(a.last.playback.playing, true);
 check.ok('extension seats leaving don\'t pause a YouTube video');
 
+// Netflix rolling on to the next episode moves the room on.
+const g = client(PORT, 'Ana', 'ext-room-3', { ext: 'Netflix' });
+const h = client(PORT, 'Ben', 'ext-room-3', { ext: 'Netflix' });
+await Promise.all([g.joined, h.joined]);
+g.emit('show:add', { title: 'Dark', service: 'Netflix', season: 1, episode: 3 }); await wait(50);
+g.emit('show:watch', { id: g.last.shows[0].id }); await wait(50);
+const ep3 = g.last.current;
+await g.ask('queue:add', { input: 'https://www.netflix.com/watch/70000004' });
+await wait(50);
+g.emit('cmd:play', { position: 10 }); await wait(50);
+// The Shows tab item has no link, so any new title counts; the queued link is next.
+g.emit('ext:next', { itemId: ep3.id, url: 'https://www.netflix.com/watch/70000004' });
+h.emit('ext:next', { itemId: ep3.id, url: 'https://www.netflix.com/watch/70000004' }); // the second report is ignored
+await wait(80);
+assert.equal(h.last.current.url, 'https://www.netflix.com/watch/70000004');
+assert.equal(h.last.queue.length, 0);
+assert.equal(h.last.shows[0].episode, 4, 'the show moved on one episode');
+assert.equal(h.last.playback.playing, true, 'the queued episode was the one playing, so it keeps playing');
+assert.ok(h.last.playback.position < 1);
+assert.equal(h.last.extSync, true);
+check.ok('an episode rolling on moves to the queued episode and keeps playing');
+
+// Opening another title while paused keeps everyone paused.
+h.emit('cmd:pause', { position: 30 }); await wait(50);
+const paused = h.last.current;
+g.emit('ext:next', { itemId: paused.id, url: 'https://www.netflix.com/watch/70000009' }); await wait(80);
+assert.equal(h.last.current.url, 'https://www.netflix.com/watch/70000009');
+assert.equal(h.last.playback.playing, false);
+h.emit('cmd:play', { position: 0 }); await wait(50);
+check.ok('another title opened while paused stays paused');
+
+// Nothing queued: follow the new episode, still in sync.
+const ep4 = h.last.current;
+g.emit('ext:next', { itemId: ep4.id, url: 'https://www.netflix.com/watch/70000005?trackId=1' }); await wait(80);
+assert.equal(h.last.current.url, 'https://www.netflix.com/watch/70000005?trackId=1');
+assert.equal(h.last.current.title, ep4.title);
+assert.equal(h.last.playback.playing, true);
+assert.equal(h.last.extSync, true);
+assert.ok(h.toasts.some((t) => t.includes('next episode')));
+const ep5 = h.last.current;
+g.emit('ext:next', { itemId: ep5.id, url: 'https://www.netflix.com/watch/70000005' }); await wait(50);
+assert.equal(h.last.current.id, ep5.id, 'the same title again is not a new episode');
+g.emit('ext:next', { itemId: ep5.id, url: 'https://www.hulu.com/watch/abc' }); await wait(50);
+assert.equal(h.last.current.id, ep5.id, 'another service is ignored');
+check.ok('with nothing queued, the room follows the new episode');
+
+// Countdown mode: rolling on is ignored, since the room isn't synced.
+const w = client(PORT, 'Web', 'ext-room-3');
+await w.joined; await wait(50);
+g.emit('ext:next', { itemId: ep5.id, url: 'https://www.netflix.com/watch/70000006' }); await wait(50);
+assert.equal(h.last.current.id, ep5.id);
+check.ok('rolling on is ignored when the room isn\'t synced');
+[g, h, w].forEach((s) => s.disconnect());
+
 // Bad ext values are dropped.
 const f = client(PORT, 'Kim', 'ext-room-2', { ext: 'Disney+' });
 await f.joined; await wait(50);

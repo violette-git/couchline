@@ -28,6 +28,6 @@ Chrome and Edge 111 or newer.
 
 - Netflix's player API is undocumented. If Netflix changes it, play and pause fall back to the video element and seeking stops (never risking the M7375 crash), and the extension needs an update.
 - Hulu plays ads in a separate video. During an ad, the room isn't controlled; afterwards the sync loop catches up.
-- Netflix plays the next episode on its own. The room's Up next doesn't follow that; use Skip in Couchline.
+- When Netflix or Hulu rolls on to the next episode (or someone opens another title) while synced, the room moves on too: to the next item in Up next, or, if Up next is empty, to the new episode, still playing in sync. An episode put on from the Shows tab moves that show on one episode.
 - Fullscreen: the sidebar moves into the fullscreen element so it stays visible. On browsers without `moveBefore` (Chrome before 133), that reloads the sidebar, which rejoins by itself; the call reconnects.
 - The Couchline address must be https, or `http://localhost` while developing.

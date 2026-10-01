@@ -5,6 +5,16 @@
 // client id makes the offer, a failed connection is torn down and rebuilt, and a blank
 // video track keeps a video channel open for someone joining without a camera.
 
+// The camera, microphone, and speaker someone chose, remembered on this device.
+const PREFS_KEY = 'callDevices';
+const prefs = {
+  get() { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch { return {}; } },
+  set(patch) { try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs.get(), ...patch })); } catch { /* private mode */ } },
+};
+const AUDIO = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+const VIDEO = { width: { ideal: 640 }, height: { ideal: 480 } };
+const pick = (id) => (id ? { deviceId: { exact: id } } : {});
+
 function blankVideoTrack() {
   try {
     const canvas = Object.assign(document.createElement('canvas'), { width: 320, height: 240 });
@@ -33,18 +43,22 @@ export class Call {
   }
 
   async start() {
-    const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
-    try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        audio, video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-      });
-    } catch {
+    const { camera, mic } = prefs.get();
+    const audio = { ...AUDIO, ...pick(mic) };
+    const tries = [
+      { audio, video: camera ? { ...VIDEO, ...pick(camera) } : { ...VIDEO, facingMode: 'user' } },
+      // The remembered devices may be unplugged, so fall back to the defaults.
+      { audio: AUDIO, video: { ...VIDEO, facingMode: 'user' } },
+      { audio: AUDIO, video: false },
+    ];
+    this.stream = null;
+    for (const constraints of tries) {
       try {
-        this.stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
-      } catch {
-        return false;
-      }
+        this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+        break;
+      } catch { /* try the next, simpler request */ }
     }
+    if (!this.stream) return false;
     this.camOn = this.stream.getVideoTracks().length > 0;
     if (!this.camOn) {
       const blank = blankVideoTrack();
@@ -66,6 +80,63 @@ export class Call {
     this.stream = null;
     for (const id of [...this.tiles.keys()]) this.removeTile(id);
     this.socket.emit('call:state', { inCall: false });
+  }
+
+  // Cameras, microphones, and speakers on this device. Names only show once the
+  // browser has allowed the camera or mic.
+  async listDevices() {
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      const of = (kind) => all.filter((d) => d.kind === kind && d.deviceId);
+      return {
+        cameras: of('videoinput'), mics: of('audioinput'),
+        speakers: 'setSinkId' in HTMLMediaElement.prototype ? of('audiooutput') : [],
+        chosen: { ...prefs.get(), camera: this.trackDevice('video') || prefs.get().camera, mic: this.trackDevice('audio') || prefs.get().mic },
+      };
+    } catch {
+      return { cameras: [], mics: [], speakers: [], chosen: prefs.get() };
+    }
+  }
+
+  trackDevice(kind) {
+    const t = kind === 'video' ? this.stream?.getVideoTracks()[0] : this.stream?.getAudioTracks()[0];
+    return t?.getSettings?.().deviceId || null;
+  }
+
+  // Switches camera, mic, or speaker in the middle of a call without reconnecting:
+  // the new track replaces the old one on every connection.
+  async useDevice(kind, deviceId) {
+    if (kind === 'speaker') {
+      prefs.set({ speaker: deviceId });
+      for (const [id, t] of this.tiles) if (id !== this.selfId) t.video.setSinkId?.(deviceId).catch(() => {});
+      return true;
+    }
+    prefs.set(kind === 'camera' ? { camera: deviceId } : { mic: deviceId });
+    if (!this.active || !this.stream) return true; // used when the call starts
+    const video = kind === 'camera';
+    let fresh;
+    try {
+      fresh = await navigator.mediaDevices.getUserMedia(video ? { video: { ...VIDEO, ...pick(deviceId) } } : { audio: { ...AUDIO, ...pick(deviceId) } });
+    } catch {
+      return false;
+    }
+    const track = video ? fresh.getVideoTracks()[0] : fresh.getAudioTracks()[0];
+    const old = video ? this.stream.getVideoTracks()[0] : this.stream.getAudioTracks()[0];
+    // Keep mute and camera-off as they were. A blank stand-in track means the camera was off for lack of one.
+    track.enabled = old ? old.enabled || (video && !this.camOn) : true;
+    for (const pc of this.pcs.values()) {
+      const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
+      if (sender) await sender.replaceTrack(track).catch(() => {});
+    }
+    if (old) { this.stream.removeTrack(old); old.stop(); }
+    this.stream.addTrack(track);
+    if (video) {
+      this.camOn = true;
+      const self = this.tile(this.selfId);
+      self.el.classList.toggle('cam-off', !track.enabled);
+      self.video.srcObject = this.stream;
+    }
+    return true;
   }
 
   toggleMic() {
@@ -109,6 +180,8 @@ export class Call {
       const t = this.tile(id);
       if (t.video.srcObject !== e.streams[0]) {
         t.video.srcObject = e.streams[0];
+        const { speaker } = prefs.get();
+        if (speaker) t.video.setSinkId?.(speaker).catch(() => {});
         t.video.play?.().catch(() => {});
       }
     };

@@ -1,5 +1,6 @@
-// Plain video player for direct links (.mp4, .webm, .m3u8) and for Jellyfin and Plex,
-// which both hand out HLS (.m3u8) streams. Safari plays HLS on its own; other browsers
+// Plain video player for direct links (.mp4, .webm, .m3u8), for Jellyfin and Plex,
+// which both hand out HLS (.m3u8) streams, and for files on the person's own device.
+// Local files come from resolveLocal, which the app points at public/share.js. Safari plays HLS on its own; other browsers
 // get hls.js, served by Couchline from node_modules at /vendor/hls/.
 import { Player, PState, loadScript } from './player.js';
 
@@ -28,8 +29,10 @@ export class FilePlayer extends Player {
     this.video = v;
     this.el.append(v);
     this.src = null;
+    this.objectUrl = null;
     this.blocked = false;
     this.startAt = 0;
+    this.resolveLocal = null; // (item) -> File, or null when this device doesn't have it yet
     v.addEventListener('loadedmetadata', () => {
       if (this.startAt) v.currentTime = this.startAt;
       this.startAt = 0;
@@ -50,7 +53,12 @@ export class FilePlayer extends Player {
     this.live = false;
     this.startAt = start;
     const key = item.id;
-    const src = item.kind === 'file' ? item.url : withSession(item);
+    if (item.kind === 'local') {
+      const file = this.resolveLocal?.(item);
+      if (!file) return; // stays not ready; the app asks the person for the file
+      this.objectUrl = URL.createObjectURL(file);
+    }
+    const src = item.kind === 'local' ? this.objectUrl : item.kind === 'file' ? item.url : withSession(item);
     this.src = src;
     const v = this.video;
     if (item.format === 'hls' && !v.canPlayType('application/vnd.apple.mpegurl')) {
@@ -81,6 +89,8 @@ export class FilePlayer extends Player {
     this.video.pause();
     this.video.removeAttribute('src');
     this.video.load();
+    if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+    this.objectUrl = null;
   }
 
   state() {

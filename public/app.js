@@ -5,6 +5,7 @@ import { VimeoPlayer } from './players/vimeo.js';
 import { TwitchPlayer, setTwitchParents } from './players/twitch.js';
 import { FilePlayer } from './players/file.js';
 import { parseMedia, mediaWarnings, IN_BOX } from './media.js';
+import { FileShare, fingerprint, probeVideo, formatSize } from './share.js';
 import { Call } from './call.js';
 
 const $ = (s) => document.querySelector(s);
@@ -49,6 +50,7 @@ const routeMatch = location.pathname.match(/^\/r\/([a-z0-9-]{3,40})\/?$/i);
 if (routeMatch) {
   roomId = routeMatch[1].toLowerCase();
   $('#entryRoom').textContent = roomId;
+  for (const id of ['#roomCodeTop', '#roomMenuCode', '#emptyCode']) $(id).textContent = roomId;
   $('#name').value = store.get('name', '');
   $('#optRemote').checked = store.get('remote', false);
   show('entry');
@@ -58,10 +60,16 @@ if (routeMatch) {
 }
 
 $('#createRoom').addEventListener('click', () => { location.href = `/r/${newRoomCode()}`; });
+// Accepts a code ("cozy lamp 1234" works too) or a whole room link.
+function goToRoom(value) {
+  const v = value.trim();
+  const fromLink = v.match(/\/r\/([a-z0-9-]{3,40})/i);
+  const code = (fromLink ? fromLink[1] : v).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  if (code.length >= 3) location.href = `/r/${code}`;
+}
 $('#joinCode').addEventListener('submit', (e) => {
   e.preventDefault();
-  const code = $('#code').value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  if (code.length >= 3) location.href = `/r/${code}`;
+  goToRoom($('#code').value);
 });
 $('#entryForm').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -73,7 +81,7 @@ $('#entryForm').addEventListener('submit', (e) => {
 // ---------- players ----------
 // One player per source, created the first time it's needed and kept (hidden) after that,
 // so an iPhone that was tapped once for YouTube doesn't need another tap for the next video.
-const PLAYERS = { youtube: YouTubePlayer, vimeo: VimeoPlayer, twitch: TwitchPlayer, file: FilePlayer, jellyfin: FilePlayer, plex: FilePlayer };
+const PLAYERS = { youtube: YouTubePlayer, vimeo: VimeoPlayer, twitch: TwitchPlayer, file: FilePlayer, jellyfin: FilePlayer, plex: FilePlayer, local: FilePlayer };
 const playerPool = new Map();
 let player = null; // the one showing the current item, if any
 
@@ -82,6 +90,7 @@ function playerFor(kind) {
   if (!playerPool.has(Cls)) {
     const p = new Cls($('#playerSlot'));
     p.onUser = onPlayerUser;
+    p.resolveLocal = (it) => share?.get(it.fp);
     playerPool.set(Cls, p);
   }
   return playerPool.get(Cls);
@@ -103,7 +112,7 @@ const inBox = (it) => IN_BOX.includes(it?.kind);
 const isLive = (it) => !!it?.live || (!!it && player?.key === it.id && player.live);
 
 // ---------- room ----------
-let socket, clock, call;
+let socket, clock, call, share;
 let room = null;
 let me = { remote: false };
 let lastItemId = null;
@@ -128,6 +137,8 @@ function enterRoom(opts) {
   socket = window.io({ transports: ['websocket', 'polling'] });
   clock = new Clock(socket);
   call = new Call({ socket, selfId: clientId, tilesEl: $('#tiles') });
+  share = new FileShare({ socket, onChange: renderLocal, onNotice: shareNotice });
+  const restored = share.restore(); // copies downloaded before a reload
   if (opts.call) startCall(); // inside the tap, so iOS allows camera and audio
 
   socket.on('connect', () => {
@@ -137,6 +148,8 @@ function enterRoom(opts) {
       if (res?.error) return toast({ text: res.error });
       if (res?.iceServers) call.iceServers = res.iceServers;
       setTwitchParents(res?.twitchParent);
+      if (res?.iceServers) share.iceServers = res.iceServers;
+      restored.then(() => share.announce());
       await clock.calibrate();
       if (call.active) socket.emit('call:state', { inCall: true });
     });
@@ -146,7 +159,8 @@ function enterRoom(opts) {
   socket.on('toast', toast);
   socket.on('react', floatReaction);
   socket.on('go', onGo);
-  socket.on('signal', (d) => call.handleSignal(d));
+  // The call and file sharing use the same relay; file messages are marked "share".
+  socket.on('signal', (d) => (d.msg?.share ? share.handleSignal(d) : call.handleSignal(d)));
 
   setInterval(tick, 500);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { wakeLock = null; tick(); } });
@@ -159,6 +173,7 @@ function onState(s) {
   renderStage();
   renderQueue();
   renderShows();
+  renderLocal();
   call.sync(s.members);
   tick();
 }
@@ -471,7 +486,14 @@ function updateSyncPill(playing) {
   const others = room.members.filter((m) => m.id !== clientId && !m.remote);
   const lagging = others.find((m) => m.drift != null && Math.abs(m.drift) > 0.8);
   const mine = self()?.drift;
+  const cur = room.current;
+  const lacking = cur?.kind === 'local' ? room.members.filter((m) => !m.remote && !m.ext && !m.files?.includes(cur.fp)) : [];
   if (room.holds.length) { text = `Waiting for ${room.holds.join(' and ')}`; mode = 'wait'; }
+  else if (lacking.length) {
+    const names = lacking.map((m) => (m.id === clientId ? 'You' : m.name));
+    text = `${names.join(' and ')} ${names.length > 1 || names[0] === 'You' ? 'don’t' : 'doesn’t'} have the file yet`;
+    mode = 'wait';
+  }
   else if (!playing) { text = 'Paused'; mode = 'idle'; }
   else if (waitingForLaunch()) { text = 'Starting'; mode = 'idle'; }
   else if (mine != null && Math.abs(mine) > 0.8 && !me.remote) { text = 'Catching up'; mode = 'wait'; }
@@ -526,7 +548,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------- queue ----------
-const KIND_LABELS = { youtube: 'YouTube', vimeo: 'Vimeo', file: 'Video link', jellyfin: 'Jellyfin', plex: 'Plex', instagram: 'Instagram' };
+const KIND_LABELS = { youtube: 'YouTube', vimeo: 'Vimeo', file: 'Video link', jellyfin: 'Jellyfin', plex: 'Plex', instagram: 'Instagram', local: 'Video file' };
 function kindLabel(it) {
   if (it.kind === 'twitch') return it.live ? 'Twitch, live' : 'Twitch';
   if (KIND_LABELS[it.kind]) return KIND_LABELS[it.kind];
@@ -535,7 +557,7 @@ function kindLabel(it) {
   return ep ? `${svc}, ${ep}` : svc;
 }
 
-const THUMB_TEXT = { vimeo: 'V', twitch: 'TW', jellyfin: 'JF', plex: 'PLEX', instagram: 'IG' };
+const THUMB_TEXT = { vimeo: 'V', twitch: 'TW', jellyfin: 'JF', plex: 'PLEX', instagram: 'IG', local: 'FILE' };
 function thumbFor(it) {
   const box = el('div', { class: `thumb thumb-${it.kind}` });
   const src = thumbUrl(it);
@@ -571,6 +593,132 @@ function renderQueue() {
   });
   if (!rows.length) rows.push(el('li', { class: 'q-empty' }, 'Up next is empty. Add the first thing to watch.'));
   ol.replaceChildren(...rows);
+}
+
+// ---------- the add picker ----------
+// Three ways to add something (a link, a file from this device, a show name), and under the
+// link box, every source Couchline understands, each with a line on how to get its link.
+const SOURCES = [
+  { label: 'YouTube', placeholder: 'https://youtu.be/...', help: 'A video, Short, or live link. Plays here, in sync.' },
+  { label: 'Vimeo', placeholder: 'https://vimeo.com/...', help: 'A Vimeo video link, unlisted ones included. Plays here, in sync.' },
+  { label: 'Twitch', placeholder: 'https://www.twitch.tv/videos/...', help: 'A past broadcast (twitch.tv/videos/...) plays fully in sync. A channel link plays live: play and pause are shared, seeking is off. Clips can’t be synced.' },
+  { label: 'Video link', placeholder: 'https://.../movie.mp4', help: 'A direct link to an .mp4, .webm, or .m3u8 file. Plays here, in sync. For a file on your computer, use Pick a file.' },
+  { label: 'Jellyfin', placeholder: 'https://jellyfin.../Items/.../Download?api_key=...', help: 'Open the movie or episode, open its three dots menu, choose Copy Stream URL, and paste that. The link includes your sign-in token, so everyone in the room could use your account. Safer: a separate Jellyfin user that only sees this library.', warn: true },
+  { label: 'Plex', placeholder: 'https://...plex.direct:32400/library/metadata/...', help: 'Open the movie or episode, choose Get Info, then View XML, and paste that page’s link. The link includes your Plex token, which works like your password. Safer: a Plex managed user that only sees this library.', warn: true },
+  { label: 'Netflix', placeholder: 'https://www.netflix.com/watch/...', help: 'The episode or movie link. Syncs on its own when everyone uses the Couchline extension on a computer, otherwise a shared countdown.' },
+  { label: 'Hulu', placeholder: 'https://www.hulu.com/watch/...', help: 'The episode or movie link. Syncs on its own when everyone uses the Couchline extension on a computer, otherwise a shared countdown.' },
+  { label: 'Instagram', placeholder: 'https://www.instagram.com/reel/...', help: 'A reel or post link. Starts on a shared countdown.' },
+];
+$('#sourceChips').append(...SOURCES.map((src) => el('button', {
+  type: 'button', class: 'chip', 'aria-pressed': 'false',
+  onclick: (e) => {
+    const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+    for (const c of $('#sourceChips').children) c.setAttribute('aria-pressed', String(on && c === e.currentTarget));
+    $('#addInput').placeholder = on ? src.placeholder : 'Paste a link';
+    $('#sourceHelp').textContent = on ? src.help : '';
+    $('#sourceHelp').className = src.warn ? 'note note-warn' : 'note';
+    $('#sourceHelp').hidden = !on;
+    $('#addInput').focus();
+  },
+}, src.label)));
+
+$('#showAddForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = $('#showAddName').value.trim();
+  if (!input) return;
+  socket.emit('queue:add', { input, service: $('#showAddService').value, asName: true }, (res) => {
+    if (!res?.error) $('#showAddName').value = '';
+  });
+});
+
+$('#filePick').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const status = $('#fileStatus');
+  status.textContent = `Checking ${file.name}.`;
+  const duration = await probeVideo(file);
+  if (duration == null) {
+    status.textContent = 'This browser can’t play that file. An .mp4 (H.264 video, AAC audio) plays everywhere.';
+    return;
+  }
+  const fp = await share.add(file);
+  socket.emit('queue:addLocal', { name: file.name, size: file.size, mime: file.type, fp, duration }, (res) => {
+    status.textContent = res?.error || `Added ${file.name}. It plays from this device.`;
+  });
+});
+
+// ---------- files from people's devices ----------
+let localKey = '';
+let mismatch = null; // { itemId, file } when someone picked a copy that isn't the same file
+
+async function pickCopy(file, cur) {
+  if (!file) return;
+  $('#localStatus').textContent = 'Checking the file.';
+  const fp = await fingerprint(file);
+  if (fp === cur.fp) {
+    mismatch = null;
+    await share.add(file);
+  } else {
+    mismatch = { itemId: cur.id, file };
+    localKey = '';
+    renderLocal();
+  }
+}
+
+function renderLocal() {
+  const cur = room?.current;
+  if (!share) return;
+  // A copy just arrived (picked or downloaded), so start the player with it.
+  if (cur?.kind === 'local' && share.has(cur.fp) && player?.key === cur.id && !player.ready) {
+    player.load(cur, expectedNow());
+    tick();
+  }
+  const need = cur?.kind === 'local' && !me.remote && !share.has(cur.fp);
+  $('#localCard').hidden = !need;
+  if (!need) { localKey = ''; return; }
+
+  const t = share.incoming(cur.fp);
+  const failed = [...share.transfers.values()].reverse().find((x) => x.dir === 'in' && x.fp === cur.fp && x.error);
+  const owners = room.members.filter((m) => m.id !== clientId && m.files?.includes(cur.fp));
+  const wrongFile = mismatch?.itemId === cur.id ? mismatch.file : null;
+
+  // Rebuild the buttons only when they change, so an open file dialog isn't swept away.
+  const key = JSON.stringify([cur.id, t?.id, owners.map((m) => m.id), !!wrongFile]);
+  if (key !== localKey) {
+    localKey = key;
+    $('#localName').textContent = cur.title;
+    $('#localMeta').textContent = [formatSize(cur.size), cur.duration ? fmt(cur.duration) : null].filter(Boolean).join(', ');
+    const actions = [el('label', { class: 'btn btn-primary file-pick' }, 'Choose my copy',
+      el('input', { type: 'file', class: 'sr', accept: 'video/*,.mp4,.m4v,.mov,.webm,.mkv', onchange: (e) => pickCopy(e.target.files[0], cur) }))];
+    if (t) actions.push(el('button', { class: 'btn btn-quiet', onclick: () => share.cancel(t.id) }, 'Stop'));
+    else for (const m of owners) actions.push(el('button', { class: 'btn', onclick: () => share.request(m.id, cur) }, `Get it from ${m.name}`));
+    if (wrongFile) {
+      actions.push(el('button', { class: 'btn btn-quiet', onclick: () => { mismatch = null; share.useAnyway(cur.fp, wrongFile); } }, 'Use mine anyway'));
+    }
+    $('#localActions').replaceChildren(...actions);
+  }
+
+  const bar = $('#localProgress');
+  bar.hidden = !t;
+  let status = '';
+  if (t) {
+    const from = room.members.find((m) => m.id === t.peer)?.name || 'them';
+    bar.style.setProperty('--p', `${t.size ? (t.done / t.size) * 100 : 0}%`);
+    status = t.state === 'connecting' ? `Connecting to ${from}.` : `Getting it from ${from}: ${formatSize(t.done)} of ${formatSize(t.size)}. It plays as soon as it’s here.`;
+  } else if (wrongFile) {
+    status = 'That isn’t the same file (a different size or version), so it may not line up with everyone else.';
+  } else if (failed) {
+    status = failed.error;
+  } else if (!owners.length) {
+    status = 'Nobody in the room can send it right now, so pick your own copy.';
+  }
+  $('#localStatus').textContent = status;
+}
+
+function shareNotice(t) {
+  const to = room?.members.find((m) => m.id === t.peer)?.name || 'someone';
+  toast({ text: t.state === 'done' ? `Sent ${t.name} to ${to}` : `Sending ${t.name} to ${to}` });
 }
 
 // Link detection uses the same parser as the server (public/media.js), so the hint under
@@ -657,13 +805,98 @@ $('#showForm').addEventListener('submit', (e) => {
   $('#showEpisode').value = '1';
 });
 
+// Each tab list (the panel tabs, and the add picker's modes) switches only its own panels.
 for (const btn of document.querySelectorAll('[role=tab]')) {
   btn.addEventListener('click', () => {
-    for (const b of document.querySelectorAll('[role=tab]')) {
+    for (const b of btn.closest('[role=tablist]').querySelectorAll('[role=tab]')) {
       const on = b === btn;
       b.setAttribute('aria-selected', String(on));
       document.getElementById(b.getAttribute('aria-controls')).hidden = !on;
     }
+  });
+}
+
+// ---------- room menu ----------
+function setRoomMenu(open) {
+  $('#roomMenu').hidden = !open;
+  $('#roomChip').setAttribute('aria-expanded', String(open));
+}
+$('#roomChip').addEventListener('click', () => setRoomMenu($('#roomMenu').hidden));
+document.addEventListener('click', (e) => { if (!e.target.closest('.room-wrap')) setRoomMenu(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setRoomMenu(false); });
+async function copy(text, done) {
+  try { await navigator.clipboard.writeText(text); toast({ text: done }); } catch { toast({ text }); }
+}
+$('#copyCode').addEventListener('click', () => copy(roomId, 'Copied the room code'));
+$('#copyLink').addEventListener('click', () => copy(`${location.origin}/r/${roomId}`, 'Copied the room link'));
+$('#switchRoom').addEventListener('submit', (e) => {
+  e.preventDefault();
+  goToRoom($('#switchCode').value);
+});
+
+// ---------- call layout and full screen ----------
+function setLayout(layout) {
+  document.body.dataset.callLayout = layout;
+  store.set('callLayout', layout);
+  for (const b of document.querySelectorAll('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === layout));
+}
+setLayout(store.get('callLayout', 'below'));
+for (const b of document.querySelectorAll('[data-layout]')) b.addEventListener('click', () => setLayout(b.dataset.layout));
+
+// Full screen keeps the call on screen (floating, or half and half). Phones that can't make a
+// page full screen (iPhone) still get the same full-window view.
+function setFull(on) {
+  document.body.classList.toggle('is-full', on);
+  $('#fullBtn').textContent = on ? 'Exit full screen' : 'Full screen';
+  if (on && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+  if (!on && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+}
+$('#fullBtn').addEventListener('click', () => setFull(!document.body.classList.contains('is-full')));
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('is-full')) setFull(false); });
+
+// Tap a face to make it bigger; double tap for full screen.
+$('#tiles').addEventListener('click', (e) => {
+  const tile = e.target.closest('.tile');
+  if (!tile) return;
+  const big = !tile.classList.contains('is-big');
+  for (const t of $('#tiles').children) t.classList.remove('is-big');
+  tile.classList.toggle('is-big', big);
+});
+$('#tiles').addEventListener('dblclick', (e) => {
+  const video = e.target.closest('.tile')?.querySelector('video');
+  if (!video) return;
+  if (video.requestFullscreen) video.requestFullscreen().catch(() => {});
+  else video.webkitEnterFullscreen?.();
+});
+
+// ---------- camera, microphone, speaker ----------
+async function renderDevices() {
+  const { cameras, mics, speakers, chosen } = await call.listDevices();
+  const fill = (sel, list, current, fallback) => {
+    sel.replaceChildren(...list.map((d, i) => el('option', { value: d.deviceId, selected: d.deviceId === current }, d.label || `${fallback} ${i + 1}`)));
+    sel.disabled = !list.length;
+  };
+  fill($('#camSelect'), cameras, chosen.camera, 'Camera');
+  fill($('#micSelect'), mics, chosen.mic, 'Microphone');
+  fill($('#speakerSelect'), speakers, chosen.speaker, 'Speaker');
+  $('#speakerField').hidden = !speakers.length;
+  const unnamed = [...cameras, ...mics].some((d) => !d.label);
+  $('#deviceNote').textContent = !cameras.length && !mics.length
+    ? 'No camera or microphone found.'
+    : unnamed ? 'Join the call once to see device names. Your choice is remembered on this device.' : 'Your choice is remembered on this device.';
+}
+$('#devicesBtn').addEventListener('click', () => {
+  const open = $('#devicePanel').hidden;
+  $('#devicePanel').hidden = !open;
+  $('#devicesBtn').setAttribute('aria-expanded', String(open));
+  if (open) renderDevices();
+});
+navigator.mediaDevices?.addEventListener?.('devicechange', () => { if (!$('#devicePanel').hidden) renderDevices(); });
+for (const [sel, kind] of [['#camSelect', 'camera'], ['#micSelect', 'mic'], ['#speakerSelect', 'speaker']]) {
+  $(sel).addEventListener('change', async (e) => {
+    const ok = await call.useDevice(kind, e.target.value);
+    if (!ok) toast({ text: 'That device couldn’t be used. It may be busy in another app.' });
+    renderCallButtons();
   });
 }
 
@@ -674,6 +907,7 @@ async function startCall() {
     toast({ text: 'Camera and mic are blocked. You can still watch. Allow them in your browser settings to join the call.' });
   }
   renderCallButtons();
+  if (!$('#devicePanel').hidden) renderDevices(); // names appear once the camera is allowed
 }
 function renderCallButtons() {
   $('#joinCallBtn').hidden = call.active;

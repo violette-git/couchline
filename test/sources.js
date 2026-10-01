@@ -82,7 +82,39 @@ assert.deepEqual(d.last.queue.map((q) => q.kind), saved.queue.map((q) => q.kind)
 assert.equal(d.last.current.kind, 'file');
 ok('saved queues with the new kinds restore');
 
+// Files from people's own devices: only a description is shared.
+const FP = 'a'.repeat(64);
+const e = client(PORT, 'Ana', 'sources-room-3');
+const f = client(PORT, 'Ben', 'sources-room-3');
+await Promise.all([e.joined, f.joined]);
+r = await e.ask('queue:addLocal', { name: 'Home Movie.mp4', size: 123456789, mime: 'video/mp4', fp: FP, duration: 5400 });
+assert.ok(r.ok);
+await wait(50);
+const local = f.last.current;
+assert.deepEqual([local.kind, local.title, local.name, local.size, local.fp, local.duration], ['local', 'Home Movie', 'Home Movie.mp4', 123456789, FP, 5400]);
+assert.equal(local.url, undefined, 'no link to the file is ever shared');
+assert.deepEqual(f.last.members.find((m) => m.name === 'Ana').files, [FP], 'the adder can share it');
+assert.deepEqual(f.last.members.find((m) => m.name === 'Ben').files, []);
+f.emit('local:have', { fps: [FP, 'not-a-fingerprint'] }); await wait(50);
+assert.deepEqual(e.last.members.find((m) => m.name === 'Ben').files, [FP]);
+f.emit('cmd:play', { position: 10 }); await wait(50);
+assert.equal(e.last.playback.playing, true, 'local files are synced like any video');
+r = await e.ask('queue:addLocal', { name: 'x.mp4', size: 10, fp: 'short' });
+assert.ok(r.error, 'a bad fingerprint is refused');
+r = await e.ask('queue:addLocal', { name: '', size: 10, fp: FP });
+assert.ok(r.error, 'a nameless file is refused');
+ok('local files: description shared, who has a copy tracked, bad input refused');
+
+// The Type a show box adds names as names, even ones that look like web addresses.
+r = await e.ask('queue:add', { input: 'S.W.A.T.', service: 'Hulu', asName: true });
+assert.ok(r.ok);
+await wait(50);
+assert.deepEqual([e.last.queue.at(-1).kind, e.last.queue.at(-1).title, e.last.queue.at(-1).service], ['stream', 'S.W.A.T.', 'Hulu']);
+r = await e.ask('queue:add', { input: 'S.W.A.T.' });
+assert.ok(r.error, 'the link box still treats it as an address');
+ok('show names with dots work from the Type a show box');
+
 console.log(`\n${check.count} source checks passed\n`);
-[a, c, d].forEach((s) => s.disconnect());
+[a, c, d, e, f].forEach((s) => s.disconnect());
 srv.kill();
 process.exit(0);

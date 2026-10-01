@@ -2,7 +2,8 @@
 // (which shows what a pasted link will become before it is sent).
 
 // Kinds that play inside the video box and stay in sync on their own.
-export const IN_BOX = ['youtube', 'vimeo', 'twitch', 'file', 'jellyfin', 'plex'];
+// "local" is a file on each person's own device (see public/share.js); it never has a link.
+export const IN_BOX = ['youtube', 'vimeo', 'twitch', 'file', 'jellyfin', 'plex', 'local'];
 // Services the Couchline browser extension can sync.
 export const EXT_SERVICES = ['Netflix', 'Hulu'];
 

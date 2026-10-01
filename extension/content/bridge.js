@@ -93,7 +93,13 @@
 
   const emit = (ev, data) => { try { port?.postMessage({ t: 'emit', ev, data }); } catch { /* sidebar reloading */ } };
   const serverNow = () => Date.now() + offset;
-  const syncingHere = () => !!room?.extSync && room.current?.service === SERVICE && onWatchPage();
+  // Only drive the video when this tab shows the room's title. Right after an episode rolls on,
+  // a tab still in the last one's credits waits for its own roll-on instead of being moved.
+  const sameTitle = () => {
+    const want = (room.current.url?.match(/\/watch\/([\w-]+)/) || [])[1];
+    return !want || want === watchId();
+  };
+  const syncingHere = () => !!room?.extSync && room.current?.service === SERVICE && onWatchPage() && sameTitle();
 
   // Reports what the person did with the site's own controls. A seek is ours if it landed
   // where we sent it. A play or pause only matters when it disagrees with the room. A pause
@@ -315,10 +321,18 @@
   });
 
   // Netflix and Hulu change pages without reloading, so watch the address.
+  // Moving from one /watch/ title to another while synced is the site rolling on to the next
+  // episode (or the person picking another title), so the room moves on too. Every tab reports
+  // it and the server acts on the first report.
   let lastPath = location.pathname;
   setInterval(() => {
     if (location.pathname === lastPath) return;
+    const before = lastPath;
     lastPath = location.pathname;
+    if (before.startsWith('/watch/') && onWatchPage() && room?.extSync && room.current?.service === SERVICE) {
+      emit('ext:next', { itemId: room.current.id, url: `${location.origin}${location.pathname}` });
+      metaSentFor = null;
+    }
     sendPage();
     refreshVisibility();
   }, 1000);

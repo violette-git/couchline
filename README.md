@@ -9,10 +9,15 @@ Watch together from two places, on computers and phones (and a TV browser if you
 | Twitch | Past broadcasts (twitch.tv/videos/...) are fully synced. Live channels share play and pause; seeking is off because live has no shared timeline. Clips aren't supported. Twitch's own buttons stay usable, and pressing them moves the whole room. |
 | Video links | Direct .mp4, .webm, and .m3u8 (HLS) links play in the video box, fully synced. |
 | Jellyfin and Plex | Stream links play in the video box, fully synced. See "Jellyfin and Plex links" below before sharing one. |
+| Video files on your device | Pick a file and it plays from your device, fully synced. Nothing is uploaded. Everyone else picks their own copy, or gets it straight from someone who has it, browser to browser. Downloaded copies are kept in the browser (the last 3) so a reload doesn't download again. |
 | Instagram reels | Shown in the room. A shared countdown tells you both when to tap play. |
-| Netflix and Hulu | On computers with the Couchline extension (in `extension/`), play, pause, and seek are synced automatically. Without it, each of you watches on your own account and a shared countdown tells you when to press play. The Shows tab keeps your place in a series. |
+| Netflix and Hulu | On computers with the Couchline extension (in `extension/`), play, pause, and seek are synced automatically, and when the episode rolls on, the room rolls on too. Without it, each of you watches on your own account and a shared countdown tells you when to press play. The Shows tab keeps your place in a series. |
 
-Also included: a built-in video call, reactions, a shared "Up next" list, auto-pause when someone drops off, a pause while either person is buffering, phone-sleep prevention during playback, and a remote mode (use a phone as the remote while a TV browser plays the video).
+Up next has three ways to add something (paste a link, pick a file, type a show), and every source is listed under the link box with how to get its link.
+
+The room code is in the top bar: tap it to copy the code or link, join another room, or leave. The empty room shows the code big, and the home page has a box to type one (or paste a whole room link).
+
+Also included: a built-in video call (with the call below the video, half and half, or floating over it, a full screen view that keeps faces on screen, tap a face to enlarge it, and a choice of camera, microphone, and speaker, switchable mid-call), reactions, a shared "Up next" list, auto-pause when someone drops off, a pause while either person is buffering, phone-sleep prevention during playback, and a remote mode (use a phone as the remote while a TV browser plays the video).
 
 ## Run it on your computer
 

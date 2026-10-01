@@ -55,7 +55,10 @@ const fmt = (s) => {
 
 // Link parsing lives in public/media.js so the add form can preview links with the same rules.
 
-const DEFAULT_TITLES = { youtube: 'YouTube video', vimeo: 'Vimeo video', file: 'Video', jellyfin: 'Jellyfin video', plex: 'Plex video' };
+const DEFAULT_TITLES = { youtube: 'YouTube video', vimeo: 'Vimeo video', file: 'Video', jellyfin: 'Jellyfin video', plex: 'Plex video', local: 'Video file' };
+const FINGERPRINT = /^[0-9a-f]{64}$/;
+// The Netflix or Hulu title in a watch link, used to tell episodes apart.
+const watchId = (url) => (String(url || '').match(/\/watch\/([\w-]+)/) || [])[1] || null;
 function defaultTitle(m) {
   if (DEFAULT_TITLES[m.kind]) return DEFAULT_TITLES[m.kind];
   if (m.kind === 'twitch') return m.live ? `${m.channel} on Twitch` : 'Twitch video';
@@ -74,6 +77,17 @@ function cleanItem(raw) {
       service: SERVICES.includes(raw.service) ? raw.service : linked?.service || null,
       url: linked?.kind === 'stream' && linked.url ? linked.url : null,
     };
+  } else if (raw.kind === 'local') {
+    // A file on each person's own device. Only its description is shared, never the file.
+    base = {
+      kind: 'local',
+      name: str(raw.name, 200),
+      size: num(raw.size, 0, 1e13, 0),
+      fp: FINGERPRINT.test(raw.fp) ? raw.fp : null,
+      mime: /^video\/[\w.+-]{1,40}$/.test(raw.mime) ? raw.mime : null,
+      start: 0,
+    };
+    if (!base.name || !base.size || !base.fp) return null;
   } else {
     base = parseMedia(raw.url);
     if (!base?.kind || base.kind === 'stream') return null;
@@ -181,7 +195,7 @@ function publicState(room) {
     shows: room.shows,
     countdown: room.countdown,
     members: [...room.members.values()].map((m) => ({
-      id: m.id, name: m.name, color: m.color, remote: m.remote, ext: m.ext, inCall: m.inCall, drift: m.drift,
+      id: m.id, name: m.name, color: m.color, remote: m.remote, ext: m.ext, inCall: m.inCall, drift: m.drift, files: m.files,
     })),
     holds: [...room.holds.keys()].map((cid) => room.members.get(cid)?.name).filter(Boolean),
     serverNow: Date.now(),
@@ -251,6 +265,20 @@ function startCountdown(room, seconds, by, from = null) {
   }, seconds * 1000);
 }
 
+// A Netflix or Hulu episode from the Shows tab finished, so the show moves on one episode.
+function finishEpisode(room, item, by) {
+  const show = item?.showId && room.shows.find((s) => s.id === item.showId);
+  if (!show || item.kind !== 'stream') return;
+  show.episode = Math.min(999, (item.episode || show.episode) + 1);
+  show.updatedBy = by?.name || null;
+}
+
+// Starts the current item from the top, playing or paused as before (used when an episode rolls on).
+function keepPlaying(room, playing = true) {
+  setPlayback(room, playing, 0);
+  room.extSyncFor = extSynced(room) ? room.current.id : null; // skip the "sync just turned on" pause
+}
+
 function advance(room, by) {
   const next = room.queue.shift() || null;
   setCurrent(room, next);
@@ -316,6 +344,7 @@ io.on('connection', (socket) => {
       color: previous?.color || pickColor(room), remote: !!data.remote, inCall: false, drift: null,
       // Set when this seat is the Couchline extension running on a Netflix or Hulu page.
       ext: EXT_SERVICES.includes(data.ext) ? data.ext : null,
+      files: [], // fingerprints of local video files this seat can play (and share)
     };
     room.members.set(clientId, me);
     socket.join(roomId);
@@ -365,7 +394,35 @@ io.on('connection', (socket) => {
   });
   on('media:ended', (d) => {
     if (!room.current || room.current.id !== d.itemId) return; // someone else already advanced
+    finishEpisode(room, room.current, me);
     advance(room, me);
+    broadcast(room);
+  });
+  // Netflix or Hulu moved on to another title by itself (the next episode, usually).
+  // Every extension tab reports it; the first report wins, like media:ended.
+  on('ext:next', (d) => {
+    const cur = room.current;
+    if (!cur || cur.id !== d.itemId || !extSynced(room)) return;
+    const next = parseMedia(d.url);
+    if (next?.kind !== 'stream' || next.service !== cur.service || watchId(next.url) === watchId(cur.url)) return;
+    finishEpisode(room, cur, me);
+    // Autoplay rolls on mid-playback. Picking another title while paused leaves everyone paused.
+    const wasPlaying = room.playback.playing || room.heldPause;
+    const queued = room.queue[0];
+    if (queued) {
+      advance(room, me);
+      // The queue held this very episode, so carry on playing instead of pausing everyone.
+      if (queued.kind === 'stream' && queued.service === cur.service && watchId(queued.url) === watchId(next.url)) keepPlaying(room, wasPlaying);
+      toast(room, `${cur.service} moved on, so the room moved to ${queued.title}`);
+    } else {
+      // Nothing queued: follow the new episode so the binge stays in sync.
+      setCurrent(room, cleanItem({
+        kind: 'stream', service: cur.service, url: next.url, title: cur.title, season: cur.season,
+        episode: cur.episode ? cur.episode + 1 : null, showId: cur.showId, addedBy: cur.addedBy,
+      }));
+      keepPlaying(room, wasPlaying);
+      toast(room, `${cur.service} moved on to the next episode. Still in sync.`);
+    }
     broadcast(room);
   });
   on('buffering', (d) => {
@@ -403,8 +460,9 @@ io.on('connection', (socket) => {
   });
 
   // ----- queue -----
+  // "asName" comes from the Type a show box, so "S.W.A.T." isn't mistaken for a web address.
   on('queue:add', (d, cb) => {
-    const media = parseMedia(d.input);
+    const media = d.asName ? (str(d.input, 120) ? { kind: 'stream', title: str(d.input, 120) } : null) : parseMedia(d.input);
     if (media?.error) return cb({ error: media.error });
     if (!media) return cb({ error: 'That link isn’t supported. Paste a YouTube, Vimeo, Twitch, Instagram, Netflix, Hulu, Jellyfin, Plex, or video file link, or type a show name.' });
     if (room.queue.length >= 100) return cb({ error: 'Up next is full. Remove something first.' });
@@ -429,6 +487,23 @@ io.on('connection', (socket) => {
         broadcast(room);
       });
     }
+  });
+  // A video file on the adder's device. Others pick their own copy or get it from someone who has it.
+  on('queue:addLocal', (d, cb) => {
+    if (room.queue.length >= 100) return cb({ error: 'Up next is full. Remove something first.' });
+    const item = cleanItem({ kind: 'local', name: d.name, size: d.size, fp: d.fp, mime: d.mime, duration: d.duration, title: str(d.name, 140).replace(/\.[\w]{2,5}$/, ''), addedBy: me.name });
+    if (!item) return cb({ error: 'That file couldn’t be added.' });
+    if (!me.files.includes(item.fp)) me.files = [...me.files, item.fp].slice(-20);
+    const putOn = !room.current;
+    if (putOn) setCurrent(room, item);
+    else room.queue.push(item);
+    broadcast(room);
+    cb({ ok: true });
+    toast(room, putOn ? `${me.name} put on ${item.title}` : `${me.name} added ${item.title}`, me);
+  });
+  on('local:have', (d) => {
+    me.files = (Array.isArray(d.fps) ? d.fps : []).filter((f) => FINGERPRINT.test(f)).slice(-20);
+    broadcast(room);
   });
   on('queue:remove', (d) => {
     room.queue = room.queue.filter((it) => it.id !== d.id);
