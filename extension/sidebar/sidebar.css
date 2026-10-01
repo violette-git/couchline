@@ -1,0 +1,33 @@
+/* Sidebar layout. Tokens, person colors, buttons, call tiles, roster, reactions, and toasts
+   all come from the web app's stylesheet (lib/styles.css), so both look like one product. */
+
+body.side { padding: 0; min-height: 100vh; }
+.side-join, .side-room { display: grid; gap: 0.9rem; padding: 0.75rem 0.9rem 1.25rem; align-content: start; }
+.side-head { display: flex; align-items: center; gap: 0.6rem; }
+.side-head .btn { margin-left: auto; }
+.side-code { color: var(--muted); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.side-form { display: grid; gap: 0.9rem; }
+.side-form h1 { font-size: 2rem; font-weight: 800; font-stretch: 80%; line-height: 1; margin: 0.25rem 0 0; }
+
+.side-roster { margin: 0; flex-wrap: wrap; row-gap: 0.4rem; }
+
+.side-card { position: relative; display: grid; gap: 0.4rem; padding: 0.9rem; border: 1px solid var(--line); border-radius: var(--r-small); background: var(--night-2); overflow: hidden; }
+.side-card .stream-service, .side-card .hint, .side-card .error { margin: 0; }
+.side-title { margin: 0; font-size: 1.5rem; font-weight: 800; font-stretch: 80%; line-height: 1; }
+.side-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }
+.side-actions:not(:has(> :not([hidden]))) { display: none; }
+
+/* The countdown takes over the card: one number, in the color of whoever started it. */
+.side-countdown { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 0.5rem; background: rgb(19 26 49 / 0.92); }
+.side-countdown .count-num { font-size: 5.5rem; }
+.side-countdown.beat .count-num { animation: beat 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.side-flash { position: absolute; inset: auto 0 0; padding: 0.8rem 0.9rem; font-size: 1.15rem; }
+
+.side-reactions { padding: 0; flex-wrap: wrap; }
+.side-reactions .react-btn { width: 42px; height: 42px; font-size: 1.25rem; }
+
+.side-room .call { padding: 0; }
+.side-room .tiles { grid-template-columns: 1fr 1fr; }
+.side-leave { justify-self: start; }
+.side-room .toasts { width: calc(100% - 1.5rem); }

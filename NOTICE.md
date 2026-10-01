@@ -1,8 +1,10 @@
 Couchline includes code adapted from WatchParty (https://github.com/howardchung/watchparty):
-- public/youtube.js: YouTube player wrapper (from src/components/App/YouTube.ts)
+- public/players/player.js: the shared player interface every source implements (from src/components/App/Player.ts)
+- public/players/youtube.js: YouTube player wrapper (from src/components/App/YouTube.ts)
 - public/sync.js: playback-rate catch-up rule (from src/components/App/App.tsx)
 - public/call.js: WebRTC call connection pattern (from src/components/VideoChat/VideoChat.tsx)
 - server.js: signaling relay keyed by client id (from server/room.ts)
+- extension/lib/sync.js and extension/lib/call.js: unchanged copies of public/sync.js and public/call.js, packaged into the browser extension
 
 WatchParty license:
 
@@ -27,3 +29,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Third-party libraries served or packaged by Couchline keep their own licenses:
+- hls.js (Apache License 2.0), served from node_modules at /vendor/hls/
+- Socket.IO client (MIT), packaged as extension/lib/socket.io.min.js

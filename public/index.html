@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Couchline">
-  <meta name="description" content="Watch YouTube, Instagram, Netflix, and Hulu together from two places.">
+  <meta name="description" content="Watch YouTube, Vimeo, Twitch, your own videos, Netflix, and Hulu together from two places.">
   <title>Couchline</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -24,7 +24,7 @@
     <div class="landing-inner">
       <p class="pair" aria-hidden="true"><span class="seat" data-color="lamp"></span><span class="seat" data-color="rose"></span></p>
       <h1 class="marquee">Couch&shy;line</h1>
-      <p class="lede">Watch together from two places. YouTube stays in sync on its own. Netflix, Hulu, and Instagram start on a shared countdown.</p>
+      <p class="lede">Watch together from two places. YouTube, Vimeo, Twitch, and your own video links stay in sync on their own. Netflix and Hulu sync with the Couchline extension, or start on a shared countdown.</p>
       <div class="landing-actions">
         <button id="createRoom" class="btn btn-primary btn-big">Start a room</button>
         <form id="joinCode" class="inline-form">
@@ -62,13 +62,14 @@
         <div id="stage" class="stage">
           <div id="emptyStage" class="empty-stage">
             <p class="empty-title">Nothing’s on yet</p>
-            <p class="hint">Paste a YouTube or Instagram link, or type a show name.</p>
+            <p class="hint">Paste a YouTube, Vimeo, Twitch, or video link, or type a show name.</p>
           </div>
 
-          <div id="ytWrap" class="fill" hidden>
-            <div id="yt"></div>
+          <div id="playerWrap" class="fill" hidden>
+            <div id="playerSlot" class="player-slot"></div>
             <button id="tapShield" class="tap-shield" aria-label="Play or pause"></button>
             <p id="tapToStart" class="tap-banner" hidden>Tap the video once to start it on this device.</p>
+            <p id="playerNote" class="player-note" hidden role="status"></p>
           </div>
 
           <div id="remotePoster" class="fill remote-poster" hidden>
@@ -84,7 +85,9 @@
             <p id="streamService" class="stream-service"></p>
             <h2 id="streamTitle" class="stream-title"></h2>
             <p id="streamEp" class="stream-ep"></p>
-            <p class="hint">Open it on your own screen and pause at the start. When you’re both ready, tap Start together.</p>
+            <p id="streamHint" class="hint">Open it on your own screen and pause at the start. When you’re both ready, tap Start together.</p>
+            <p id="extNote" class="hint ext-note" hidden></p>
+            <p><button id="becomeRemote" class="btn btn-small" hidden>Use this tab as a remote</button></p>
           </div>
 
           <div id="countdown" class="countdown" hidden aria-live="assertive">
@@ -100,14 +103,14 @@
             <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>
             <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h4v15H6zm8 0h4v15h-4z"/></svg>
           </button>
-          <button id="back10" class="ctl" aria-label="Back 10 seconds">-10</button>
-          <button id="fwd10" class="ctl" aria-label="Forward 10 seconds">+10</button>
+          <button id="back10" class="ctl seekable" aria-label="Back 10 seconds">-10</button>
+          <button id="fwd10" class="ctl seekable" aria-label="Forward 10 seconds">+10</button>
           <span class="readout">
             <span id="time" class="time">0:00</span>
             <span id="syncPill" class="sync-pill">In sync</span>
           </span>
           <button id="skipBtn" class="ctl ctl-text">Skip</button>
-          <input type="range" id="scrub" class="scrub" min="0" max="1" step="0.1" value="0" aria-label="Seek">
+          <input type="range" id="scrub" class="scrub seekable" min="0" max="1" step="0.1" value="0" aria-label="Seek">
         </div>
 
         <div id="startBar" class="start-bar" hidden>
@@ -144,6 +147,7 @@
             <button class="btn btn-primary">Add</button>
           </form>
           <p id="addError" class="error" hidden></p>
+          <div id="addNotes" class="add-notes" hidden aria-live="polite"></div>
           <ol id="queue" class="queue"></ol>
         </div>
 

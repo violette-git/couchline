@@ -1,5 +1,10 @@
 import { Clock, expectedPosition, correction, fmt } from './sync.js';
-import { YouTubePlayer, YTState } from './youtube.js';
+import { PState } from './players/player.js';
+import { YouTubePlayer } from './players/youtube.js';
+import { VimeoPlayer } from './players/vimeo.js';
+import { TwitchPlayer, setTwitchParents } from './players/twitch.js';
+import { FilePlayer } from './players/file.js';
+import { parseMedia, mediaWarnings, IN_BOX } from './media.js';
 import { Call } from './call.js';
 
 const $ = (s) => document.querySelector(s);
@@ -65,8 +70,40 @@ $('#entryForm').addEventListener('submit', (e) => {
   enterRoom({ name, call: $('#optCall').checked, remote: $('#optRemote').checked });
 });
 
+// ---------- players ----------
+// One player per source, created the first time it's needed and kept (hidden) after that,
+// so an iPhone that was tapped once for YouTube doesn't need another tap for the next video.
+const PLAYERS = { youtube: YouTubePlayer, vimeo: VimeoPlayer, twitch: TwitchPlayer, file: FilePlayer, jellyfin: FilePlayer, plex: FilePlayer };
+const playerPool = new Map();
+let player = null; // the one showing the current item, if any
+
+function playerFor(kind) {
+  const Cls = PLAYERS[kind];
+  if (!playerPool.has(Cls)) {
+    const p = new Cls($('#playerSlot'));
+    p.onUser = onPlayerUser;
+    playerPool.set(Cls, p);
+  }
+  return playerPool.get(Cls);
+}
+
+// Someone used the embed's own buttons (only players with ownControls report these).
+let userActedAt = 0;
+function onPlayerUser(kind, position) {
+  const cur = room?.current;
+  if (!cur || player?.key !== cur.id) return;
+  userActedAt = performance.now();
+  // A room held for someone's buffering is still meant to be playing.
+  const meantToPlay = room.playback.playing || room.holds.length > 0;
+  if (kind === 'play' && !meantToPlay) socket.emit('cmd:play', { position: expectedNow() });
+  else if (kind === 'pause' && meantToPlay) socket.emit('cmd:pause', { position: player.time() });
+  else if (kind === 'seek' && !isLive(cur)) socket.emit('cmd:seek', { position });
+}
+const inBox = (it) => IN_BOX.includes(it?.kind);
+const isLive = (it) => !!it?.live || (!!it && player?.key === it.id && player.live);
+
 // ---------- room ----------
-let socket, clock, yt, call;
+let socket, clock, call;
 let room = null;
 let me = { remote: false };
 let lastItemId = null;
@@ -90,7 +127,6 @@ function enterRoom(opts) {
 
   socket = window.io({ transports: ['websocket', 'polling'] });
   clock = new Clock(socket);
-  if (!me.remote) yt = new YouTubePlayer('yt');
   call = new Call({ socket, selfId: clientId, tilesEl: $('#tiles') });
   if (opts.call) startCall(); // inside the tap, so iOS allows camera and audio
 
@@ -100,6 +136,7 @@ function enterRoom(opts) {
     }, async (res) => {
       if (res?.error) return toast({ text: res.error });
       if (res?.iceServers) call.iceServers = res.iceServers;
+      setTwitchParents(res?.twitchParent);
       await clock.calibrate();
       if (call.active) socket.emit('call:state', { inCall: true });
     });
@@ -135,6 +172,7 @@ function renderRoster() {
     el('span', { class: 'dot' }),
     el('span', { class: 'who' }, m.name),
     m.remote ? el('span', { class: 'tag' }, 'remote') : null,
+    m.ext ? el('span', { class: 'tag' }, 'extension') : null,
   )));
 }
 
@@ -145,30 +183,49 @@ function epLabel(it) {
   return '';
 }
 
+// A picture for the item, where the source gives one without an account.
+function thumbUrl(it, size = 'mq') {
+  if (it.kind === 'youtube') return `https://i.ytimg.com/vi/${it.videoId}/${size}default.jpg`;
+  if (it.kind === 'vimeo') return it.thumb || null;
+  if (it.kind === 'twitch' && it.live) return `https://static-cdn.jtvnw.net/previews-ttv/live_user_${it.channel}-640x360.jpg`;
+  return null;
+}
+
+// Netflix and Hulu play in sync when everyone is on the Couchline extension.
+const extSynced = () => !!room?.extSync;
+const syncedNow = () => inBox(room?.current) || extSynced();
+
 function renderStage() {
   const cur = room.current;
   const kind = cur?.kind ?? null;
+  const box = inBox(cur);
   const stage = $('#stage');
   stage.dataset.kind = kind || 'empty';
+  stage.classList.toggle('has-player', box);
   $('#emptyStage').hidden = !!cur;
-  $('#ytWrap').hidden = !(kind === 'youtube' && !me.remote);
-  $('#remotePoster').hidden = !(kind === 'youtube' && me.remote);
+  $('#playerWrap').hidden = !(box && !me.remote);
+  $('#remotePoster').hidden = !(box && me.remote);
   $('#igWrap').hidden = kind !== 'instagram';
   $('#streamCard').hidden = kind !== 'stream';
-  $('#controls').hidden = kind !== 'youtube';
+  $('#controls').hidden = !syncedNow();
+  $('#controls').classList.toggle('is-live', isLive(cur));
   $('#startBar').hidden = !(kind === 'instagram' || kind === 'stream') || !!room.countdown;
 
   if ((cur?.id ?? null) !== lastItemId) {
     lastItemId = cur?.id ?? null;
     endedSent = null;
     playPendingSince = 0;
-    setTapNeeded(false);
-    if (kind === 'youtube') {
-      if (yt) yt.load(cur.videoId, room.playback.position);
-      $('#remoteThumb').src = `https://i.ytimg.com/vi/${cur.videoId}/hqdefault.jpg`;
-    } else if (yt?.ready) {
-      yt.stop();
+    const next = box && !me.remote ? playerFor(kind) : null;
+    for (const p of playerPool.values()) {
+      if (p !== next && p.key) p.stop();
+      p.show(p === next);
     }
+    player = next;
+    setTapNeeded(false);
+    player?.load(cur, room.playback.position);
+    const thumb = box ? thumbUrl(cur, 'hq') : null;
+    $('#remoteThumb').hidden = !thumb;
+    if (thumb) $('#remoteThumb').src = thumb;
     const frame = $('#igFrame');
     if (kind === 'instagram') frame.src = `https://www.instagram.com/${cur.igType}/${cur.code}/embed/`;
     else frame.removeAttribute('src'); // stops a reel that's still playing
@@ -179,8 +236,9 @@ function renderStage() {
     $('#streamService').textContent = cur.service && cur.service !== 'Other' ? cur.service : 'On your own screen';
     $('#streamTitle').textContent = cur.title;
     $('#streamEp').textContent = epLabel(cur);
+    renderExtNote(cur);
     open.hidden = !cur.url;
-    if (cur.url) { open.href = cur.url; open.textContent = `Open ${cur.service || 'link'}`; }
+    if (cur.url) { open.href = inviteLink(cur.url); open.textContent = `Open ${cur.service || 'link'}`; }
   } else if (kind === 'instagram') {
     open.hidden = false;
     open.href = cur.url;
@@ -189,6 +247,35 @@ function renderStage() {
     open.hidden = true;
   }
   renderCountdown();
+}
+
+// Tells the extension which room to offer when this link opens on Netflix or Hulu.
+// It only fills in the join form there; the person still has to press Join.
+function inviteLink(url) {
+  if (!/^https:\/\/(www\.)?(netflix|hulu)\.com\//.test(url)) return url;
+  return `${url.split('#')[0]}#couchline=${encodeURIComponent(roomId)}&server=${encodeURIComponent(location.origin)}`;
+}
+
+function renderExtNote(cur) {
+  const note = $('#extNote');
+  const hint = $('#streamHint');
+  const becomeRemote = $('#becomeRemote');
+  const supported = cur.service === 'Netflix' || cur.service === 'Hulu';
+  const viewers = room.members.filter((m) => !m.remote);
+  const missing = viewers.filter((m) => m.ext !== cur.service);
+  hint.hidden = extSynced();
+  becomeRemote.hidden = true;
+  if (!supported) { note.hidden = true; return; }
+  note.hidden = false;
+  if (extSynced()) {
+    note.textContent = `Synced through the Couchline extension. Play, pause, or seek on ${cur.service} and everyone follows. This tab works as a remote.`;
+  } else if (viewers.some((m) => m.ext)) {
+    const names = missing.map((m) => (m.id === clientId ? 'you (this tab)' : m.name));
+    note.textContent = `Automatic sync turns on when everyone watching is on the Couchline extension. Still needed: ${names.join(' and ')}.`;
+    becomeRemote.hidden = !missing.some((m) => m.id === clientId);
+  } else {
+    note.textContent = `On a computer? With the Couchline extension, ${cur.service} plays in sync on its own.`;
+  }
 }
 
 function renderCountdown() {
@@ -217,7 +304,7 @@ function onGo({ itemId }) {
   const cur = room?.current;
   if (!cur || cur.id !== itemId) return;
   navigator.vibrate?.(60);
-  if (cur.kind === 'youtube') return;
+  if (syncedNow()) return;
   flash(cur.kind === 'instagram' ? 'Tap play now' : `Press play on ${cur.service && cur.service !== 'Other' ? cur.service : 'your screen'} now`);
 }
 
@@ -229,9 +316,14 @@ function flash(text) {
   flash.t = setTimeout(() => { f.hidden = true; }, 2600);
 }
 
+let tapNeeded = false;
 function setTapNeeded(on) {
+  tapNeeded = on;
   $('#tapToStart').hidden = !on;
-  $('#tapShield').hidden = on; // let the tap reach YouTube's own player once
+  // Embeds (YouTube, Vimeo) need the tap to land on their own player once.
+  // A plain video has no button of its own, so the shield stays and starts it directly.
+  // Twitch keeps its own buttons, so it never gets the shield.
+  $('#tapShield').hidden = (on && !!player?.tapThrough) || !!player?.ownControls;
 }
 
 // ---------- the sync loop ----------
@@ -245,19 +337,25 @@ function tick() {
   if (!room) return;
   updateControls();
   const cur = room.current;
-  if (!cur || cur.kind !== 'youtube' || me.remote || !yt?.ready || yt.videoId !== cur.videoId) {
+  renderPlayerNote();
+  if (!cur || !inBox(cur) || me.remote || !player?.ready || player.key !== cur.id) {
+    // Until an embed is ready, let taps reach it, in case it shows a check or a button of its own.
+    if (player && player.key === cur?.id && player.tapThrough) $('#tapShield').hidden = true;
     setWake(false);
     return;
   }
-  const st = yt.state();
-  const t = yt.time();
-  const exp = expectedNow();
   const now = performance.now();
+  // Give the room a moment to echo back what the person just did on the embed's own buttons.
+  if (now - userActedAt < 1500) return;
+  const st = player.state();
+  const t = player.time();
+  const exp = expectedNow();
+  const live = isLive(cur);
 
-  const dur = yt.duration();
-  if (dur && !cur.duration) socket.emit('media:meta', { itemId: cur.id, duration: dur });
+  const dur = player.duration();
+  if (dur && !cur.duration && !live) socket.emit('media:meta', { itemId: cur.id, duration: dur });
 
-  if (st === YTState.ENDED) {
+  if (st === PState.ENDED) {
     if (endedSent !== cur.id && room.playback.playing) {
       endedSent = cur.id;
       socket.emit('media:ended', { itemId: cur.id });
@@ -266,7 +364,7 @@ function tick() {
   }
 
   if (roomIsPlaying()) {
-    if (st === YTState.BUFFERING) {
+    if (st === PState.BUFFERING) {
       bufferingSince ||= now;
       if (!reportedBuffering && now - bufferingSince > 1500) {
         reportedBuffering = true;
@@ -275,43 +373,52 @@ function tick() {
       return;
     }
     bufferingSince = 0;
-    if (st !== YTState.PLAYING) {
+    if (st !== PState.PLAYING) {
       playPendingSince ||= now;
       if (now - lastSeekAt > 1000) {
-        if (Math.abs(t - exp) > 1 && st !== YTState.CUED && st !== YTState.UNSTARTED) yt.seek(exp);
-        yt.play();
+        if (!live && Math.abs(t - exp) > 1 && st !== PState.CUED && st !== PState.UNSTARTED) player.seek(exp);
+        player.play();
         lastSeekAt = now;
       }
       // iPhones block video that starts without a tap. Ask once, then the API works.
-      if (now - playPendingSince > 2500 && (st === YTState.CUED || st === YTState.UNSTARTED)) setTapNeeded(true);
+      if (now - playPendingSince > 2500 && (st === PState.CUED || st === PState.UNSTARTED) && !player.error) setTapNeeded(true);
       return;
     }
     playPendingSince = 0;
     setTapNeeded(false);
     if (reportedBuffering) { reportedBuffering = false; socket.emit('buffering', { on: false }); }
-    if (!yt.fineRates) yt.checkRates();
+    setWake(true);
+    // A live stream has no shared timeline. Everyone just watches the live edge.
+    if (live) return;
+    if (!player.fineRates) player.checkRates();
     const drift = t - exp;
-    const fix = correction(drift, { fineRates: yt.fineRates, settling: now - lastSeekAt < 2000 });
-    if (fix.seek) { yt.seek(exp + 0.2); lastSeekAt = now; } else if (fix.rate !== yt.rate()) yt.setRate(fix.rate);
+    const fix = correction(drift, { fineRates: player.fineRates, settling: now - lastSeekAt < 2000 });
+    if (fix.seek) { player.seek(exp + 0.2); lastSeekAt = now; } else if (fix.rate !== player.rate()) player.setRate(fix.rate);
     if (now - lastDriftSent > 2000) {
       lastDriftSent = now;
       socket.emit('drift', { value: Math.round(drift * 10) / 10 });
     }
-    setWake(true);
   } else {
     playPendingSince = 0;
     setTapNeeded(false);
     bufferingSince = 0;
     if (reportedBuffering) { reportedBuffering = false; socket.emit('buffering', { on: false }); }
-    if (st === YTState.PLAYING || st === YTState.BUFFERING) yt.pause();
-    if (yt.rate() !== 1) yt.setRate(1);
+    if (st === PState.PLAYING || st === PState.BUFFERING) player.pause();
+    if (player.rate() !== 1) player.setRate(1);
     const target = room.playback.position;
-    if (st !== YTState.CUED && st !== YTState.UNSTARTED && Math.abs(t - target) > 0.5 && now - lastSeekAt > 800) {
-      yt.seek(target);
+    if (!live && st !== PState.CUED && st !== PState.UNSTARTED && Math.abs(t - target) > 0.5 && now - lastSeekAt > 800) {
+      player.seek(target);
       lastSeekAt = now;
     }
     setWake(false);
   }
+}
+
+function renderPlayerNote() {
+  const note = $('#playerNote');
+  const text = inBox(room?.current) && player?.key === room.current.id ? player.error : null;
+  note.hidden = !text;
+  if (text && note.textContent !== text) note.textContent = text;
 }
 
 async function setWake(on) {
@@ -331,23 +438,33 @@ async function setWake(on) {
 
 // ---------- controls ----------
 function durationNow() {
-  return (yt?.videoId === room?.current?.videoId && yt?.duration()) || room?.current?.duration || 0;
+  return (player && player.key === room?.current?.id && player.duration()) || room?.current?.duration || 0;
 }
 
 function updateControls() {
-  if (!room?.current || room.current.kind !== 'youtube') return;
+  if (!room?.current || !syncedNow()) return;
   const exp = expectedNow();
   const dur = durationNow();
   const playing = room.playback.playing;
   $('#playBtn').classList.toggle('is-playing', playing);
   $('#playBtn').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  // A stream can turn out to be live only once it loads, so this is checked every tick.
+  $('#controls').classList.toggle('is-live', isLive(room.current));
+  if (isLive(room.current)) $('#time').textContent = 'Live';
+  else updateTimeline(exp, dur);
+  updateSyncPill(playing);
+}
+
+function updateTimeline(exp, dur) {
   const scrub = $('#scrub');
   scrub.disabled = !dur;
   scrub.max = String(dur || 1);
   if (!scrubbing) scrub.value = String(dur ? Math.min(exp, dur) : 0);
   scrub.style.setProperty('--fill', dur ? `${(Number(scrub.value) / dur) * 100}%` : '0%');
   $('#time').textContent = `${fmt(scrubbing ? Number(scrub.value) : exp)}${dur ? ` / ${fmt(dur)}` : ''}`;
+}
 
+function updateSyncPill(playing) {
   const pill = $('#syncPill');
   let text = 'In sync';
   let mode = 'ok';
@@ -364,22 +481,32 @@ function updateControls() {
 }
 
 function togglePlay() {
-  if (!room?.current || room.current.kind !== 'youtube') return;
+  if (!room?.current || !syncedNow()) return;
   const position = expectedNow();
   if (room.playback.playing) {
     socket.emit('cmd:pause', { position });
   } else {
-    yt?.play(); // play inside the tap so iOS treats it as user-started
+    if (player?.key === room.current.id) player.play(); // play inside the tap so iOS treats it as user-started
     socket.emit('cmd:play', { position });
   }
 }
 const seekBy = (delta) => {
+  if (!room?.current || isLive(room.current)) return;
   const dur = durationNow() || Infinity;
   socket.emit('cmd:seek', { position: Math.min(dur, Math.max(0, expectedNow() + delta)) });
 };
 
 $('#playBtn').addEventListener('click', togglePlay);
-$('#tapShield').addEventListener('click', togglePlay);
+$('#tapShield').addEventListener('click', () => {
+  if (tapNeeded) player?.play(); // the one tap an iPhone needs before a video can play
+  else togglePlay();
+});
+$('#becomeRemote').addEventListener('click', () => {
+  me.remote = true;
+  document.body.classList.add('is-remote');
+  socket.emit('member:remote', { on: true });
+  lastItemId = undefined; // re-render the stage as a remote
+});
 $('#back10').addEventListener('click', () => seekBy(-10));
 $('#fwd10').addEventListener('click', () => seekBy(10));
 $('#skipBtn').addEventListener('click', () => socket.emit('queue:skip'));
@@ -399,18 +526,22 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------- queue ----------
+const KIND_LABELS = { youtube: 'YouTube', vimeo: 'Vimeo', file: 'Video link', jellyfin: 'Jellyfin', plex: 'Plex', instagram: 'Instagram' };
 function kindLabel(it) {
-  if (it.kind === 'youtube') return 'YouTube';
-  if (it.kind === 'instagram') return 'Instagram';
+  if (it.kind === 'twitch') return it.live ? 'Twitch, live' : 'Twitch';
+  if (KIND_LABELS[it.kind]) return KIND_LABELS[it.kind];
   const ep = epLabel(it);
   const svc = it.service && it.service !== 'Other' ? it.service : 'Your own screen';
   return ep ? `${svc}, ${ep}` : svc;
 }
 
+const THUMB_TEXT = { vimeo: 'V', twitch: 'TW', jellyfin: 'JF', plex: 'PLEX', instagram: 'IG' };
 function thumbFor(it) {
   const box = el('div', { class: `thumb thumb-${it.kind}` });
-  if (it.kind === 'youtube') box.append(el('img', { src: `https://i.ytimg.com/vi/${it.videoId}/mqdefault.jpg`, alt: '', loading: 'lazy' }));
-  else if (it.kind === 'instagram') box.textContent = 'IG';
+  const src = thumbUrl(it);
+  if (src) box.append(el('img', { src, alt: '', loading: 'lazy' }));
+  else if (it.kind === 'file') box.textContent = it.format === 'hls' ? 'HLS' : it.format.toUpperCase();
+  else if (THUMB_TEXT[it.kind]) box.textContent = THUMB_TEXT[it.kind];
   else box.textContent = it.service === 'Hulu' ? 'H' : it.service === 'Netflix' ? 'N' : 'TV';
   return box;
 }
@@ -442,11 +573,41 @@ function renderQueue() {
   ol.replaceChildren(...rows);
 }
 
-const looksLikeLink = (v) => /^(https?:\/\/|www\.)|^[\w-]+\.[a-z]{2,}(\/|$)/i.test(v.trim());
+// Link detection uses the same parser as the server (public/media.js), so the hint under
+// the box always matches what will actually happen.
+const SOURCE_HINTS = {
+  youtube: 'YouTube. Plays here, in sync.',
+  vimeo: 'Vimeo. Plays here, in sync.',
+  file: 'Video link. Plays here, in sync.',
+  jellyfin: 'Jellyfin. Plays here, in sync.',
+  plex: 'Plex. Plays here, in sync.',
+  instagram: 'Instagram. Starts on a shared countdown.',
+};
+function sourceHint(m) {
+  if (m.kind === 'twitch') return m.live ? 'Twitch live stream. Plays here. Play and pause are shared; seeking is off for live.' : 'Twitch video. Plays here, in sync.';
+  if (SOURCE_HINTS[m.kind]) return SOURCE_HINTS[m.kind];
+  if (m.service) return `${m.service}. Syncs on its own when everyone uses the Couchline extension, otherwise a shared countdown.`;
+  return null;
+}
+
+// "warnFrom" is the index of the first line to show as a warning.
+function renderAddNotes(lines, warnFrom = 0) {
+  const box = $('#addNotes');
+  box.replaceChildren(...lines.map((t, i) => el('p', { class: i >= warnFrom ? 'note note-warn' : 'note' }, t)));
+  box.hidden = !lines.length;
+}
+
 $('#addInput').addEventListener('input', (e) => {
-  const v = e.target.value;
-  $('#addService').hidden = !v.trim() || looksLikeLink(v);
+  const v = e.target.value.trim();
+  const m = v ? parseMedia(v) : null;
+  const typedName = m?.kind === 'stream' && !m.url;
+  $('#addService').hidden = !typedName;
   $('#addError').hidden = true;
+  if (!m || typedName) return renderAddNotes([]);
+  if (m.error) return renderAddNotes([m.error]);
+  const hint = sourceHint(m);
+  const warnings = mediaWarnings(m, { secure: location.protocol === 'https:' });
+  renderAddNotes([hint, ...warnings].filter(Boolean), hint ? 1 : 0);
 });
 $('#addForm').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -460,6 +621,8 @@ $('#addForm').addEventListener('submit', (e) => {
     }
     $('#addInput').value = '';
     $('#addService').hidden = true;
+    // Token warnings stay up after adding, since the link is now shared with the room.
+    renderAddNotes(res?.warnings || []);
   });
 });
 

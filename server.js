@@ -6,6 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
+import { parseMedia, mediaWarnings, IN_BOX, EXT_SERVICES } from './public/media.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -14,11 +15,14 @@ const HOLD_LIMIT_MS = 20000; // stop waiting on a buffering viewer after 20s
 const MEMBER_COLORS = ['lamp', 'rose', 'sky', 'mint'];
 const SERVICES = ['Netflix', 'Hulu', 'Other'];
 const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
+// Twitch only plays inside pages on the domains listed here (comma separated, no scheme or port).
+const TWITCH_PARENT = (process.env.TWITCH_PARENT || 'localhost').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 
 const app = express();
 app.disable('x-powered-by');
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/config', (_req, res) => res.json({ iceServers: iceServers() }));
+app.use('/vendor/hls', express.static(path.join(__dirname, 'node_modules', 'hls.js', 'dist')));
+app.get('/config', (_req, res) => res.json({ iceServers: iceServers(), twitchParent: TWITCH_PARENT }));
 app.get('/r/:roomId', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 const server = http.createServer(app);
@@ -49,44 +53,12 @@ const fmt = (s) => {
   return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
 };
 
-// Turns whatever someone pasted into a media descriptor, or null if unsupported.
-export function parseMedia(raw) {
-  const input = str(raw, 500);
-  if (!input) return null;
-  let url = null;
-  if (!/\s/.test(input)) {
-    try { url = new URL(/^https?:\/\//i.test(input) ? input : `https://${input}`); } catch { url = null; }
-  }
-  const host = url ? url.hostname.replace(/^(www\.|m\.)/, '') : '';
+// Link parsing lives in public/media.js so the add form can preview links with the same rules.
 
-  if (url && (host === 'youtu.be' || host.endsWith('youtube.com'))) {
-    let videoId = host === 'youtu.be' ? url.pathname.slice(1) : url.searchParams.get('v');
-    if (!videoId) {
-      const m = url.pathname.match(/^\/(shorts|live|embed)\/([\w-]{6,})/);
-      if (m) videoId = m[2];
-    }
-    videoId = (videoId || '').split('/')[0];
-    if (/^[\w-]{6,20}$/.test(videoId)) {
-      const t = (url.searchParams.get('t') || '').replace(/s$/, '');
-      return { kind: 'youtube', videoId, url: `https://www.youtube.com/watch?v=${videoId}`, start: num(t, 0, 1e6, 0) };
-    }
-    return null;
-  }
-  if (url && host.endsWith('instagram.com')) {
-    const m = url.pathname.match(/^\/(reels?|p|tv)\/([\w-]{5,})/);
-    if (!m) return null;
-    const igType = m[1] === 'p' ? 'p' : 'reel';
-    return { kind: 'instagram', igType, code: m[2], url: `https://www.instagram.com/${igType}/${m[2]}/` };
-  }
-  if (url && (host.endsWith('netflix.com') || host.endsWith('hulu.com'))) {
-    return { kind: 'stream', service: host.endsWith('netflix.com') ? 'Netflix' : 'Hulu', url: url.href };
-  }
-  if (url && input.includes('.')) return null; // some other website we can't sync
-  return { kind: 'stream', title: input.slice(0, 120) }; // typed a show or movie name
-}
-
+const DEFAULT_TITLES = { youtube: 'YouTube video', vimeo: 'Vimeo video', file: 'Video', jellyfin: 'Jellyfin video', plex: 'Plex video' };
 function defaultTitle(m) {
-  if (m.kind === 'youtube') return 'YouTube video';
+  if (DEFAULT_TITLES[m.kind]) return DEFAULT_TITLES[m.kind];
+  if (m.kind === 'twitch') return m.live ? `${m.channel} on Twitch` : 'Twitch video';
   if (m.kind === 'instagram') return m.igType === 'p' ? 'Instagram post' : 'Instagram reel';
   return m.service ? `${m.service} title` : 'Untitled';
 }
@@ -104,8 +76,9 @@ function cleanItem(raw) {
     };
   } else {
     base = parseMedia(raw.url);
-    if (!base || base.kind === 'stream') return null;
-    if (base.kind === 'youtube' && !base.start) base.start = num(raw.start, 0, 1e6, 0);
+    if (!base?.kind || base.kind === 'stream') return null;
+    if ('start' in base && !base.start && !base.live) base.start = num(raw.start, 0, 1e6, 0);
+    if (base.kind === 'vimeo' && /^https:\/\/i\.vimeocdn\.com\/[\w./-]+$/.test(str(raw.thumb, 300))) base.thumb = str(raw.thumb, 300);
   }
   return {
     ...base,
@@ -133,12 +106,18 @@ function cleanShow(raw) {
   };
 }
 
-async function youtubeTitle(videoId) {
+// Title (and for Vimeo, a thumbnail) from the site's public oEmbed endpoint.
+const OEMBED = {
+  youtube: (it) => `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(it.url)}`,
+  vimeo: (it) => `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(it.url)}`,
+};
+async function oembed(item) {
   try {
-    const url = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(OEMBED[item.kind](item), { signal: AbortSignal.timeout(3000) });
     if (!r.ok) return null;
-    return str((await r.json()).title, 140) || null;
+    const j = await r.json();
+    const thumb = str(j.thumbnail_url, 300);
+    return { title: str(j.title, 140) || null, thumb: /^https:\/\/i\.vimeocdn\.com\//.test(thumb) ? thumb : null };
   } catch {
     return null;
   }
@@ -152,9 +131,9 @@ function getRoom(roomId) {
   if (!room) {
     room = {
       id: roomId, fresh: true, current: null, queue: [], shows: [], countdown: null,
-      playback: { playing: false, position: 0, at: Date.now() },
+      playback: { playing: false, position: 0, at: Date.now(), fresh: true },
       members: new Map(), holds: new Map(), heldPause: false,
-      countdownTimer: null, cleanup: null, driftTimer: null,
+      countdownTimer: null, cleanup: null, driftTimer: null, extSyncFor: null,
     };
     rooms.set(roomId, room);
   }
@@ -168,27 +147,63 @@ const posNow = (room) => {
   const p = room.playback;
   return p.playing ? p.position + Math.max(0, Date.now() - p.at) / 1000 : p.position;
 };
-const setPlayback = (room, playing, position, at = Date.now()) => {
-  room.playback = { playing, position: Math.max(0, position), at };
+// "fresh" means nobody has pressed play, pause, or seek on this item yet. The extension
+// uses it to leave each person where they are until someone starts playback.
+const setPlayback = (room, playing, position, at = Date.now(), fresh = false) => {
+  room.playback = { playing, position: Math.max(0, position), at, fresh };
 };
+
+const inBox = (room) => IN_BOX.includes(room.current?.kind);
+// A Netflix or Hulu item plays in sync when every viewer (everyone who isn't a remote)
+// is in the room through the Couchline extension on that service.
+function extSynced(room) {
+  const cur = room.current;
+  if (cur?.kind !== 'stream' || !EXT_SERVICES.includes(cur.service)) return false;
+  const viewers = [...room.members.values()].filter((m) => !m.remote);
+  return viewers.length > 0 && viewers.every((m) => m.ext === cur.service);
+}
+// Synced means the server's playback state drives every screen.
+const synced = (room) => inBox(room) || extSynced(room);
+// Whether this member's screen is playing the current item, so their dropping off should pause the room.
+function isWatching(room, m) {
+  if (m.remote) return false;
+  if (inBox(room)) return !m.ext;
+  return extSynced(room);
+}
 
 function publicState(room) {
   return {
     id: room.id,
     current: room.current,
     playback: room.playback,
+    extSync: extSynced(room),
     queue: room.queue,
     shows: room.shows,
     countdown: room.countdown,
     members: [...room.members.values()].map((m) => ({
-      id: m.id, name: m.name, color: m.color, remote: m.remote, inCall: m.inCall, drift: m.drift,
+      id: m.id, name: m.name, color: m.color, remote: m.remote, ext: m.ext, inCall: m.inCall, drift: m.drift,
     })),
     holds: [...room.holds.keys()].map((cid) => room.members.get(cid)?.name).filter(Boolean),
     serverNow: Date.now(),
   };
 }
-const broadcast = (room) => io.to(room.id).emit('state', publicState(room));
 const toast = (room, text, by) => io.to(room.id).emit('toast', { text, color: by?.color || null });
+function broadcast(room) {
+  // Extension sync turning on pauses the room without moving anyone, so nobody jumps to a
+  // stale position. The next play, from whoever presses it, brings everyone to that spot.
+  const extFor = extSynced(room) ? room.current.id : null;
+  if (extFor !== room.extSyncFor) {
+    if (extFor) {
+      clearHolds(room);
+      setPlayback(room, false, posNow(room), Date.now(), true);
+      toast(room, `Everyone has the extension, so ${room.current.service} is synced. Press play on ${room.current.service} to start everyone from your spot.`);
+    } else if (room.extSyncFor && room.extSyncFor === room.current?.id) {
+      toast(room, 'Not everyone is on the extension, so this one is back to the shared countdown.');
+    }
+    room.extSyncFor = extFor;
+  }
+  io.to(room.id).emit('state', publicState(room));
+}
 
 function pickColor(room) {
   const used = new Set([...room.members.values()].map((m) => m.color));
@@ -211,17 +226,22 @@ function setCurrent(room, item) {
   clearCountdown(room);
   clearHolds(room);
   room.current = item;
-  setPlayback(room, false, item?.kind === 'youtube' ? item.start || 0 : 0);
+  for (const m of room.members.values()) m.drift = null; // drift was about the previous item
+  setPlayback(room, false, item?.start || 0, Date.now(), true);
 }
 
-// Both screens count down together. For YouTube the server schedules playback to begin at
-// launchAt, so each client starts on its own synced clock instead of waiting for a message.
-function startCountdown(room, seconds, by) {
+// Both screens count down together. For synced items the server schedules playback to begin
+// at launchAt, so each client starts on its own synced clock instead of waiting for a message.
+// "from" lets the extension start a fresh item from the starter's own spot.
+function startCountdown(room, seconds, by, from = null) {
   if (!room.current) return;
   clearCountdown(room);
   const launchAt = Date.now() + seconds * 1000;
   const itemId = room.current.id;
-  if (room.current.kind === 'youtube') setPlayback(room, true, room.playback.playing ? posNow(room) : room.playback.position, launchAt);
+  if (synced(room)) {
+    const pos = room.playback.fresh && from != null ? from : room.playback.playing ? posNow(room) : room.playback.position;
+    setPlayback(room, true, pos, launchAt);
+  }
   room.countdown = { launchAt, itemId, color: by?.color || null };
   room.countdownTimer = setTimeout(() => {
     room.countdownTimer = null;
@@ -234,9 +254,9 @@ function startCountdown(room, seconds, by) {
 function advance(room, by) {
   const next = room.queue.shift() || null;
   setCurrent(room, next);
-  // YouTube rolls straight on after a short countdown. Instagram and streaming
+  // Videos in the box roll straight on after a short countdown. Instagram and streaming
   // services wait for someone to tap Start together, since each person has to open them.
-  if (next?.kind === 'youtube') startCountdown(room, 5, by);
+  if (IN_BOX.includes(next?.kind)) startCountdown(room, 5, by);
 }
 
 function updateHolds(room) {
@@ -277,7 +297,8 @@ io.on('connection', (socket) => {
       console.error(event, err);
     }
   });
-  const isYouTube = () => room.current?.kind === 'youtube';
+  const isSynced = () => synced(room);
+  const canSeek = () => isSynced() && !room.current.live; // live streams have no timeline to share
 
   socket.on('time:ping', (cb) => typeof cb === 'function' && cb(Date.now()));
 
@@ -293,17 +314,25 @@ io.on('connection', (socket) => {
     me = {
       id: clientId, socketId: socket.id, name: str(data.name, 24) || 'Guest',
       color: previous?.color || pickColor(room), remote: !!data.remote, inCall: false, drift: null,
+      // Set when this seat is the Couchline extension running on a Netflix or Hulu page.
+      ext: EXT_SERVICES.includes(data.ext) ? data.ext : null,
     };
     room.members.set(clientId, me);
     socket.join(roomId);
-    if (typeof cb === 'function') cb({ ok: true, clientId, iceServers: iceServers() });
+    if (typeof cb === 'function') cb({ ok: true, clientId, iceServers: iceServers(), twitchParent: TWITCH_PARENT });
     broadcast(room);
     if (!previous) toast(room, `${me.name} joined`, me);
   });
 
-  // ----- playback (YouTube) -----
+  // A web seat can turn itself into a remote, so it stops counting as a viewer.
+  on('member:remote', (d) => {
+    me.remote = !!d.on;
+    broadcast(room);
+  });
+
+  // ----- playback (everything in the video box, plus Netflix and Hulu through the extension) -----
   on('cmd:play', (d) => {
-    if (!isYouTube()) return;
+    if (!isSynced()) return;
     clearCountdown(room);
     clearHolds(room);
     setPlayback(room, true, num(d.position, 0, 1e6, posNow(room)));
@@ -311,7 +340,7 @@ io.on('connection', (socket) => {
     toast(room, `${me.name} pressed play`, me);
   });
   on('cmd:pause', (d) => {
-    if (!isYouTube()) return;
+    if (!isSynced()) return;
     clearCountdown(room);
     clearHolds(room);
     setPlayback(room, false, num(d.position, 0, 1e6, posNow(room)));
@@ -319,7 +348,7 @@ io.on('connection', (socket) => {
     toast(room, `${me.name} paused at ${fmt(room.playback.position)}`, me);
   });
   on('cmd:seek', (d) => {
-    if (!isYouTube()) return;
+    if (!canSeek()) return;
     const p = num(d.position, 0, 1e6, posNow(room));
     const playing = room.playback.playing || room.heldPause;
     clearCountdown(room);
@@ -340,7 +369,7 @@ io.on('connection', (socket) => {
     broadcast(room);
   });
   on('buffering', (d) => {
-    if (!isYouTube()) return;
+    if (!isSynced()) return;
     clearTimeout(room.holds.get(me.id));
     if (d.on) {
       room.holds.set(me.id, setTimeout(() => {
@@ -359,16 +388,16 @@ io.on('connection', (socket) => {
     room.driftTimer ||= setTimeout(() => { room.driftTimer = null; broadcast(room); }, 2000);
   });
 
-  // ----- countdown (Instagram, Netflix, Hulu, and YouTube "play now") -----
+  // ----- countdown (Instagram, Netflix, Hulu, and "play now" for the video box) -----
   on('countdown:start', (d) => {
     if (!room.current) return;
-    startCountdown(room, num(d.seconds, 3, 10, 5), me);
+    startCountdown(room, num(d.seconds, 3, 10, 5), me, d.position != null ? num(d.position, 0, 1e6, 0) : null);
     broadcast(room);
   });
   on('countdown:cancel', () => {
     if (!room.countdown) return;
     clearCountdown(room);
-    if (isYouTube()) setPlayback(room, false, room.playback.position);
+    if (isSynced()) setPlayback(room, false, room.playback.position);
     broadcast(room);
     toast(room, `${me.name} cancelled the countdown`, me);
   });
@@ -376,12 +405,13 @@ io.on('connection', (socket) => {
   // ----- queue -----
   on('queue:add', (d, cb) => {
     const media = parseMedia(d.input);
-    if (!media) return cb({ error: 'That link isn’t supported. Paste a YouTube or Instagram link, or type a show name.' });
+    if (media?.error) return cb({ error: media.error });
+    if (!media) return cb({ error: 'That link isn’t supported. Paste a YouTube, Vimeo, Twitch, Instagram, Netflix, Hulu, Jellyfin, Plex, or video file link, or type a show name.' });
     if (room.queue.length >= 100) return cb({ error: 'Up next is full. Remove something first.' });
     const item = cleanItem({
       ...media,
       service: media.service || d.service,
-      title: media.kind === 'stream' && !media.url ? media.title : str(d.title, 140),
+      title: media.title || str(d.title, 140),
       addedBy: me.name,
     });
     if (!item) return cb({ error: 'That link isn’t supported.' });
@@ -389,10 +419,15 @@ io.on('connection', (socket) => {
     if (putOn) setCurrent(room, item);
     else room.queue.push(item);
     broadcast(room);
-    cb({ ok: true });
+    cb({ ok: true, warnings: mediaWarnings(item) });
     toast(room, putOn ? `${me.name} put on ${item.title}` : `${me.name} added ${item.title}`, me);
-    if (item.kind === 'youtube') {
-      youtubeTitle(item.videoId).then((t) => { if (t) { item.title = t; broadcast(room); } });
+    if (OEMBED[item.kind]) {
+      oembed(item).then((r) => {
+        if (!r) return;
+        if (r.title) item.title = r.title;
+        if (r.thumb) item.thumb = r.thumb;
+        broadcast(room);
+      });
     }
   });
   on('queue:remove', (d) => {
@@ -411,7 +446,7 @@ io.on('connection', (socket) => {
     if (i < 0) return;
     const [item] = room.queue.splice(i, 1);
     setCurrent(room, item);
-    if (item.kind === 'youtube') startCountdown(room, 3, me);
+    if (IN_BOX.includes(item.kind)) startCountdown(room, 3, me);
     broadcast(room);
     toast(room, `${me.name} put on ${item.title}`, me);
   });
@@ -483,12 +518,13 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     if (!room || !me || room.members.get(me.id)?.socketId !== socket.id) return;
+    const wasWatching = isWatching(room, me);
     room.members.delete(me.id);
     clearTimeout(room.holds.get(me.id));
     room.holds.delete(me.id);
     if (room.members.size) {
       // A remote-only phone leaving shouldn't stop the show on the TV.
-      if (!me.remote && isYouTube() && room.playback.playing && Date.now() >= room.playback.at) {
+      if (wasWatching && room.playback.playing && Date.now() >= room.playback.at) {
         setPlayback(room, false, posNow(room));
         room.heldPause = false;
         toast(room, `${me.name} dropped off. Paused at ${fmt(room.playback.position)}.`, me);
