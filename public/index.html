@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E2742">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Couchline">
+  <meta name="description" content="Watch YouTube, Instagram, Netflix, and Hulu together from two places.">
+  <title>Couchline</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <main id="landing" class="view landing">
+    <div class="landing-inner">
+      <p class="pair" aria-hidden="true"><span class="seat" data-color="lamp"></span><span class="seat" data-color="rose"></span></p>
+      <h1 class="marquee">Couch&shy;line</h1>
+      <p class="lede">Watch together from two places. YouTube stays in sync on its own. Netflix, Hulu, and Instagram start on a shared countdown.</p>
+      <div class="landing-actions">
+        <button id="createRoom" class="btn btn-primary btn-big">Start a room</button>
+        <form id="joinCode" class="inline-form">
+          <label for="code" class="sr">Room code</label>
+          <input id="code" placeholder="Have a code? Type it" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <button class="btn">Join</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <section id="entry" class="view entry" hidden>
+    <form id="entryForm" class="sheet">
+      <p class="sheet-room">Room <strong id="entryRoom"></strong></p>
+      <h2>Take a seat</h2>
+      <label class="field">Your name
+        <input id="name" maxlength="24" required autocomplete="nickname" enterkeyhint="go">
+      </label>
+      <label class="check"><input type="checkbox" id="optCall" checked> <span>Join the video call</span></label>
+      <label class="check"><input type="checkbox" id="optRemote"> <span>Use this device as a remote <small>The video plays on another screen, like a TV browser.</small></span></label>
+      <p class="hint">Wear headphones so the call doesn’t pick up the show.</p>
+      <button class="btn btn-primary btn-big">Enter room</button>
+    </form>
+  </section>
+
+  <section id="room" class="view room" hidden>
+    <header class="topbar">
+      <a href="/" class="brand">Couchline</a>
+      <ul id="roster" class="roster" aria-label="In the room"></ul>
+      <button id="share" class="btn btn-quiet btn-small">Invite</button>
+    </header>
+
+    <div class="layout">
+      <div class="main">
+        <div id="stage" class="stage">
+          <div id="emptyStage" class="empty-stage">
+            <p class="empty-title">Nothing’s on yet</p>
+            <p class="hint">Paste a YouTube or Instagram link, or type a show name.</p>
+          </div>
+
+          <div id="ytWrap" class="fill" hidden>
+            <div id="yt"></div>
+            <button id="tapShield" class="tap-shield" aria-label="Play or pause"></button>
+            <p id="tapToStart" class="tap-banner" hidden>Tap the video once to start it on this device.</p>
+          </div>
+
+          <div id="remotePoster" class="fill remote-poster" hidden>
+            <img id="remoteThumb" alt="">
+            <p>This device is the remote.</p>
+          </div>
+
+          <div id="igWrap" class="ig-wrap" hidden>
+            <iframe id="igFrame" title="Instagram video" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+          </div>
+
+          <div id="streamCard" class="stream-card" hidden>
+            <p id="streamService" class="stream-service"></p>
+            <h2 id="streamTitle" class="stream-title"></h2>
+            <p id="streamEp" class="stream-ep"></p>
+            <p class="hint">Open it on your own screen and pause at the start. When you’re both ready, tap Start together.</p>
+          </div>
+
+          <div id="countdown" class="countdown" hidden aria-live="assertive">
+            <span id="countNum" class="count-num"></span>
+            <button id="cancelCountdown" class="btn btn-quiet btn-small">Cancel</button>
+          </div>
+          <div id="goFlash" class="go-flash" hidden aria-live="assertive"></div>
+          <div id="reactLayer" class="react-layer" aria-hidden="true"></div>
+        </div>
+
+        <div id="controls" class="controls" hidden>
+          <button id="playBtn" class="ctl ctl-play" aria-label="Play">
+            <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>
+            <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h4v15H6zm8 0h4v15h-4z"/></svg>
+          </button>
+          <button id="back10" class="ctl" aria-label="Back 10 seconds">-10</button>
+          <button id="fwd10" class="ctl" aria-label="Forward 10 seconds">+10</button>
+          <span class="readout">
+            <span id="time" class="time">0:00</span>
+            <span id="syncPill" class="sync-pill">In sync</span>
+          </span>
+          <button id="skipBtn" class="ctl ctl-text">Skip</button>
+          <input type="range" id="scrub" class="scrub" min="0" max="1" step="0.1" value="0" aria-label="Seek">
+        </div>
+
+        <div id="startBar" class="start-bar" hidden>
+          <button id="startTogether" class="btn btn-primary">Start together</button>
+          <a id="openExternal" class="btn btn-quiet" target="_blank" rel="noopener" hidden>Open</a>
+          <button id="skipExternal" class="btn btn-quiet">Skip</button>
+        </div>
+
+        <div class="reactions" id="reactions" aria-label="Send a reaction"></div>
+
+        <section id="call" class="call" aria-label="Video call">
+          <div id="tiles" class="tiles"></div>
+          <div class="call-buttons">
+            <button id="joinCallBtn" class="btn btn-small">Join call</button>
+            <button id="micBtn" class="btn btn-small" hidden>Mute</button>
+            <button id="camBtn" class="btn btn-small" hidden>Camera off</button>
+            <button id="leaveCallBtn" class="btn btn-quiet btn-small" hidden>Leave call</button>
+          </div>
+        </section>
+      </div>
+
+      <aside class="panel">
+        <div class="tabs" role="tablist">
+          <button role="tab" id="tabNextBtn" aria-selected="true" aria-controls="tabNext">Up next</button>
+          <button role="tab" id="tabShowsBtn" aria-selected="false" aria-controls="tabShows">Shows</button>
+        </div>
+
+        <div id="tabNext" class="tab" role="tabpanel" aria-labelledby="tabNextBtn">
+          <form id="addForm" class="add-form">
+            <label for="addInput" class="sr">Link or show name</label>
+            <input id="addInput" placeholder="Paste a link or type a show" autocomplete="off" enterkeyhint="done">
+            <label for="addService" class="sr">Service</label>
+            <select id="addService" hidden><option>Netflix</option><option>Hulu</option><option>Other</option></select>
+            <button class="btn btn-primary">Add</button>
+          </form>
+          <p id="addError" class="error" hidden></p>
+          <ol id="queue" class="queue"></ol>
+        </div>
+
+        <div id="tabShows" class="tab" role="tabpanel" aria-labelledby="tabShowsBtn" hidden>
+          <p class="hint">Keep your shared place in a series, so nobody gets ahead by accident.</p>
+          <ul id="shows" class="shows"></ul>
+          <form id="showForm" class="show-form">
+            <label class="field">Show <input id="showTitle" maxlength="80" required placeholder="The Bear"></label>
+            <label class="field">On
+              <select id="showService"><option>Netflix</option><option>Hulu</option><option>Other</option></select>
+            </label>
+            <label class="field field-num">Season <input id="showSeason" type="number" min="1" max="99" value="1" inputmode="numeric"></label>
+            <label class="field field-num">Episode <input id="showEpisode" type="number" min="1" max="999" value="1" inputmode="numeric"></label>
+            <button class="btn">Add show</button>
+          </form>
+        </div>
+      </aside>
+    </div>
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
