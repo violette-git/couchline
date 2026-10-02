@@ -1,3 +1,4 @@
+// Copied from public/call.js by scripts/build-extension.js. Edit the original, then run npm run build:ext.
 // Video and voice call over WebRTC.
 // Connection pattern adapted from WatchParty's src/components/VideoChat/VideoChat.tsx
 // (MIT, Copyright (c) 2020 Howard Chung): one peer connection per member, the smaller

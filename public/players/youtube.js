@@ -1,9 +1,8 @@
-// YouTube IFrame player wrapper.
+// YouTube IFrame player.
 // Adapted from WatchParty's src/components/App/YouTube.ts (MIT, Copyright (c) 2020 Howard Chung).
 // Native controls are hidden so every play, pause, and seek goes through the room,
 // which keeps both screens from fighting each other.
-
-export const YTState = { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 };
+import { Player, PState } from './player.js';
 
 let apiPromise = null;
 function loadApi() {
@@ -18,14 +17,15 @@ function loadApi() {
   return apiPromise;
 }
 
-export class YouTubePlayer {
-  constructor(elementId) {
-    this.ready = false;
-    this.videoId = null;
+export class YouTubePlayer extends Player {
+  constructor(slot) {
+    super(slot);
     this.pending = null;
-    this.fineRates = false;
+    this.apiReady = false;
+    const mount = document.createElement('div');
+    this.el.append(mount);
     loadApi().then(() => {
-      this.player = new window.YT.Player(elementId, {
+      this.player = new window.YT.Player(mount, {
         width: '100%',
         height: '100%',
         playerVars: {
@@ -34,11 +34,11 @@ export class YouTubePlayer {
         },
         events: {
           onReady: () => {
-            this.ready = true;
+            this.apiReady = true;
             if (this.pending) {
-              const [id, t] = this.pending;
+              const [item, t] = this.pending;
               this.pending = null;
-              this.load(id, t);
+              this.load(item, t);
             }
           },
         },
@@ -46,11 +46,12 @@ export class YouTubePlayer {
     });
   }
 
-  load(videoId, start = 0) {
-    if (!this.ready) { this.pending = [videoId, start]; return; }
-    this.videoId = videoId;
+  load(item, start = 0) {
+    this.key = item.id;
     this.fineRates = false;
-    this.player.cueVideoById({ videoId, startSeconds: Math.max(0, start) });
+    if (!this.apiReady) { this.pending = [item, start]; return; }
+    this.ready = true;
+    this.player.cueVideoById({ videoId: item.videoId, startSeconds: Math.max(0, start) });
   }
 
   // Some videos only allow 0.25 steps, so a 1.03 nudge would silently round to 1.
@@ -59,7 +60,7 @@ export class YouTubePlayer {
     this.fineRates = rates.some((r) => r > 1 && r < 1.2);
   }
 
-  state() { return this.player?.getPlayerState?.() ?? YTState.UNSTARTED; }
+  state() { return this.player?.getPlayerState?.() ?? PState.UNSTARTED; }
   time() { return this.player?.getCurrentTime?.() ?? 0; }
   duration() { return this.player?.getDuration?.() ?? 0; }
   rate() { return this.player?.getPlaybackRate?.() ?? 1; }
@@ -67,5 +68,9 @@ export class YouTubePlayer {
   play() { this.player?.playVideo?.(); }
   pause() { this.player?.pauseVideo?.(); }
   seek(t) { this.player?.seekTo?.(Math.max(0, t), true); }
-  stop() { this.player?.stopVideo?.(); }
+  stop() {
+    this.pending = null;
+    this.key = null;
+    this.player?.stopVideo?.();
+  }
 }

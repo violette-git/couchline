@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Couchline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap">
+  <link rel="stylesheet" href="../lib/styles.css">
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+<body class="side">
+
+  <section id="joinView" class="side-join">
+    <div class="side-head">
+      <span class="brand">Couchline</span>
+      <button id="hideJoin" class="btn btn-quiet btn-small">Hide</button>
+    </div>
+    <form id="joinForm" class="side-form">
+      <h1>Watch in sync</h1>
+      <label class="field">Couchline address
+        <input id="server" placeholder="https://couchline.example.com" autocomplete="url" spellcheck="false" required>
+      </label>
+      <label class="field">Room code or link
+        <input id="room" placeholder="cozy-lamp-1234" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+      </label>
+      <label class="field">Your name
+        <input id="name" maxlength="24" autocomplete="nickname" required>
+      </label>
+      <label class="check"><input type="checkbox" id="optCall" checked> <span>Join the video call</span></label>
+      <p class="hint">Wear headphones so the call doesn’t pick up the show.</p>
+      <button class="btn btn-primary">Join room</button>
+      <p id="joinError" class="error" hidden></p>
+    </form>
+  </section>
+
+  <section id="roomView" class="side-room" hidden>
+    <div class="side-head">
+      <span class="brand">Couchline</span>
+      <span id="roomCode" class="side-code"></span>
+      <button id="hideRoom" class="btn btn-quiet btn-small">Hide</button>
+    </div>
+    <ul id="roster" class="roster side-roster" aria-label="In the room"></ul>
+
+    <div class="side-card">
+      <p id="nowService" class="stream-service"></p>
+      <p id="nowTitle" class="side-title"></p>
+      <p id="syncStatus" class="hint"></p>
+      <p id="pageWarning" class="error" hidden></p>
+      <div class="side-actions">
+        <button id="startTogether" class="btn btn-primary btn-small" hidden>Start together</button>
+        <button id="syncToMe" class="btn btn-small" hidden>Bring everyone to my spot</button>
+        <button id="watchThis" class="btn btn-small" hidden>Watch this together</button>
+      </div>
+      <div id="countdown" class="side-countdown" hidden aria-live="assertive">
+        <span id="countNum" class="count-num"></span>
+        <button id="cancelCountdown" class="btn btn-quiet btn-small">Cancel</button>
+      </div>
+      <div id="goFlash" class="go-flash side-flash" hidden aria-live="assertive"></div>
+    </div>
+
+    <div class="reactions side-reactions" id="reactions" aria-label="Send a reaction"></div>
+
+    <section class="side-chat" aria-label="Chat">
+      <ol id="chatList" class="chat-list side-chat-list"></ol>
+      <p id="typingNote" class="note typing" hidden></p>
+      <form id="chatForm" class="side-chat-form">
+        <label for="chatInput" class="sr">Message</label>
+        <input id="chatInput" placeholder="Say something" maxlength="500" autocomplete="off" enterkeyhint="send">
+        <button class="btn btn-small">Send</button>
+      </form>
+    </section>
+
+    <section class="call" aria-label="Video call">
+      <div id="tiles" class="tiles" title="Tap someone to make them bigger. Double tap for full screen."></div>
+      <div class="call-buttons">
+        <button id="joinCallBtn" class="btn btn-small">Join call</button>
+        <button id="micBtn" class="btn btn-small" hidden>Mute</button>
+        <button id="camBtn" class="btn btn-small" hidden>Camera off</button>
+        <button id="camOnBtn" class="btn btn-small" hidden>Turn camera on</button>
+        <button id="devicesBtn" class="btn btn-small" aria-expanded="false" aria-controls="devicePanel">Camera and mic</button>
+        <button id="leaveCallBtn" class="btn btn-quiet btn-small" hidden>Leave call</button>
+      </div>
+      <p id="callNote" class="note call-note" hidden role="status"></p>
+      <div id="devicePanel" class="device-panel side-devices" hidden>
+        <label class="field">Camera <select id="camSelect"></select></label>
+        <label class="field">Microphone <select id="micSelect"></select></label>
+        <label class="field" id="speakerField">Speaker <select id="speakerSelect"></select></label>
+        <label class="check"><input type="checkbox" id="optMirror" checked> <span>Mirror my video <small>Only on your screen. Everyone else sees you the right way round.</small></span></label>
+          <p id="deviceNote" class="note"></p>
+      </div>
+    </section>
+
+    <button id="leaveRoom" class="btn btn-quiet btn-small side-leave">Leave room</button>
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+  </section>
+
+  <script src="../lib/socket.io.min.js"></script>
+  <script type="module" src="sidebar.js"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+{
+  "manifest_version": 3,
+  "name": "Couchline",
+  "short_name": "Couchline",
+  "version": "0.3.0",
+  "description": "Watch Netflix and Hulu in sync with your Couchline room, chat and call beside the show, and add videos from YouTube, Vimeo, Twitch, TikTok, and Instagram without copying links.",
+  "minimum_chrome_version": "111",
+  "icons": {
+    "16": "icons/icon-192.png",
+    "48": "icons/icon-192.png",
+    "128": "icons/icon-192.png"
+  },
+  "action": {
+    "default_title": "Couchline",
+    "default_popup": "popup/popup.html"
+  },
+  "permissions": [
+    "storage",
+    "contextMenus"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.netflix.com/*"
+      ],
+      "js": [
+        "content/netflix-page.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.netflix.com/*",
+        "https://www.hulu.com/*"
+      ],
+      "js": [
+        "content/bridge.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://m.youtube.com/*",
+        "https://vimeo.com/*",
+        "https://www.twitch.tv/*",
+        "https://www.instagram.com/*",
+        "https://www.tiktok.com/*"
+      ],
+      "js": [
+        "content/anywhere.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "sidebar/*",
+        "lib/*"
+      ],
+      "matches": [
+        "https://www.netflix.com/*",
+        "https://www.hulu.com/*"
+      ]
+    },
+    {
+      "resources": [
+        "lib/*"
+      ],
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://m.youtube.com/*",
+        "https://vimeo.com/*",
+        "https://www.twitch.tv/*",
+        "https://www.instagram.com/*",
+        "https://www.tiktok.com/*"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
