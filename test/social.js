@@ -231,6 +231,44 @@ crowd.forEach((s) => s.disconnect());
 back.disconnect();
 check.ok('groups: distinct colors, five cameras, audio past that, spots passed on in order, kept across reconnects');
 
+// ---- reels together ----
+const r1 = client(PORT, 'Ana', 'social-room-reels');
+const r2 = client(PORT, 'Ben', 'social-room-reels');
+await Promise.all([r1.joined, r2.joined]);
+await r1.ask('queue:add', { input: 'https://vimeo.com/76979871' });
+await r1.ask('queue:add', { input: 'https://www.instagram.com/reel/C1aaaaaaa/' });
+await r1.ask('queue:add', { input: 'https://www.instagram.com/reel/C2bbbbbbb/' });
+await wait(50);
+r1.emit('reels:start'); await wait(50);
+assert.equal(r2.last.reels.on, true);
+assert.deepEqual(r2.last.reels.items.map((x) => x.code), ['C1aaaaaaa', 'C2bbbbbbb'], 'reels waiting in Up next move into the deck');
+assert.equal(r2.last.queue.filter((q) => q.kind === 'instagram').length, 0);
+assert.equal(r2.last.reels.driverName, 'Ana');
+let rr = await api('/api/drop', { room: 'social-room-reels', name: 'Ben', input: 'https://www.instagram.com/reel/C3ccccccc/?igsh=1' });
+assert.equal(rr.status, 200);
+await wait(50);
+assert.equal(r1.last.reels.items.length, 3, 'a reel shared while it’s on joins the deck, not Up next');
+rr = await r1.ask('queue:add', { input: 'https://www.instagram.com/reel/C3ccccccc/' });
+assert.ok(rr.error, 'the same reel twice is refused');
+rr = await r1.ask('queue:add', { input: 'https://www.tiktok.com/@scout2015/video/6718335390845095173' });
+assert.ok(rr.ok);
+await wait(50);
+assert.deepEqual(r1.last.reels.items.at(-1).kind, 'tiktok', 'TikToks join the deck too');
+r1.emit('reels:remove', { id: r1.last.reels.items.at(-1).id }); await wait(50);
+r2.emit('reels:go', { index: 2 }); await wait(50);
+assert.deepEqual([r1.last.reels.index, r1.last.reels.driverName], [2, 'Ben'], 'whoever swipes drives, and everyone is on the same reel');
+r2.emit('reels:go', { index: 99 }); await wait(50);
+assert.equal(r1.last.reels.index, 2, 'swipes stay inside the deck');
+r1.emit('reels:remove', { id: r1.last.reels.items[2].id }); await wait(50);
+assert.deepEqual([r2.last.reels.items.length, r2.last.reels.index], [2, 1]);
+r1.emit('reels:stop'); await wait(50);
+assert.equal(r2.last.reels.on, false);
+await r1.ask('queue:add', { input: 'https://www.instagram.com/reel/C4ddddddd/' });
+await wait(50);
+assert.ok(r2.last.queue.some((q) => q.code === 'C4ddddddd'), 'when it’s off, reels go to Up next as before');
+r1.disconnect(); r2.disconnect();
+check.ok('reels together: the deck, driving, adding while on, and stopping');
+
 // ---- the extension download ----
 const { unzipSync, strFromU8 } = await import('fflate');
 const zr = await fetch(`http://localhost:${PORT}/couchline-extension.zip`, { headers: { 'X-Forwarded-Proto': 'https' } });

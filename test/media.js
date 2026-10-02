@@ -42,6 +42,16 @@ assert.ok(parseMedia('https://www.twitch.tv/someone/clip/FunnyClipName').error);
 assert.ok(parseMedia('https://www.twitch.tv/directory').error);
 ok('Twitch videos and live channels; clips and site pages refused with a reason');
 
+m = parseMedia('https://www.tiktok.com/@scout2015/video/6718335390845095173?is_from_webapp=1');
+assert.deepEqual([m.kind, m.videoId, m.url], ['tiktok', '6718335390845095173', 'https://www.tiktok.com/@scout2015/video/6718335390845095173']);
+m = parseMedia('https://www.tiktok.com/@/video/7436382913001704760?_r=1');
+assert.equal(m.videoId, '7436382913001704760', 'the address a short link redirects to (no username)');
+assert.deepEqual(parseMedia('https://vm.tiktok.com/ZMhvqjqjA/'), { kind: 'tiktok', short: true, url: 'https://vm.tiktok.com/ZMhvqjqjA/' });
+assert.equal(parseMedia('tiktok.com/t/ZTRvGtwxk/').short, true);
+assert.ok(parseMedia('https://www.tiktok.com/@a/photo/7436382913001704760').error.includes('photo'));
+assert.ok(parseMedia('https://www.tiktok.com/foryou').error);
+ok('TikTok videos, short share links, and refusing photo posts');
+
 m = parseMedia('https://example.com/media/Big_Buck.Bunny.mp4?sig=abc');
 assert.deepEqual([m.kind, m.format, m.title, m.http], ['file', 'mp4', 'Big Buck Bunny', false]);
 assert.equal(parseMedia('https://cdn.example.com/a/clip.webm').format, 'webm');

@@ -4,6 +4,9 @@ import { YouTubePlayer } from './players/youtube.js';
 import { VimeoPlayer } from './players/vimeo.js';
 import { TwitchPlayer, setTwitchParents } from './players/twitch.js';
 import { FilePlayer } from './players/file.js';
+import { TikTokPlayer } from './players/tiktok.js';
+import { initSwipe } from './swipe.js';
+import { initPopout } from './popout.js';
 import { parseMedia, mediaWarnings, IN_BOX } from './media.js';
 import { FileShare, fingerprint, probeVideo, formatSize } from './share.js';
 import { Call } from './call.js';
@@ -77,7 +80,7 @@ $('#entryForm').addEventListener('submit', (e) => {
 // ---------- players ----------
 // One player per source, created the first time it's needed and kept (hidden) after that,
 // so an iPhone that was tapped once for YouTube doesn't need another tap for the next video.
-const PLAYERS = { youtube: YouTubePlayer, vimeo: VimeoPlayer, twitch: TwitchPlayer, file: FilePlayer, jellyfin: FilePlayer, plex: FilePlayer, local: FilePlayer };
+const PLAYERS = { youtube: YouTubePlayer, vimeo: VimeoPlayer, twitch: TwitchPlayer, tiktok: TikTokPlayer, file: FilePlayer, jellyfin: FilePlayer, plex: FilePlayer, local: FilePlayer };
 const playerPool = new Map();
 let player = null; // the one showing the current item, if any
 
@@ -108,7 +111,7 @@ const inBox = (it) => IN_BOX.includes(it?.kind);
 const isLive = (it) => !!it?.live || (!!it && player?.key === it.id && player.live);
 
 // ---------- room ----------
-let socket, clock, call, share, social, adding;
+let socket, clock, call, share, social, adding, swipe, popout;
 let room = null;
 let me = { remote: false };
 let lastItemId = null;
@@ -147,6 +150,8 @@ function enterRoom(opts) {
     .observe($('#tiles'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
   share = new FileShare({ socket, onChange: renderLocal, onNotice: shareNotice });
   const restored = share.restore(); // copies downloaded before a reload
+  swipe = initSwipe({ socket, getRoom: () => room });
+  popout = initPopout({ call, getRoom: () => room, onChange: () => renderCallButtons() });
   social = initSocial({ socket, clientId, getRoom: () => room, expectedNow, durationNow, isLive, thumbUrl });
   if (opts.call) startCall(); // inside the tap, so iOS allows camera and audio
 
@@ -196,6 +201,8 @@ function onState(s) {
   renderShows();
   renderLocal();
   social.onState(s);
+  swipe.render(s);
+  renderCallButtons();
   call.sync(s.members);
   tick();
 }
@@ -251,9 +258,13 @@ function renderStage() {
   // Following someone's Instagram takes over the stage until it stops.
   const following = !!room.follow;
   stage.classList.toggle('is-following', following);
-  if (following) {
+  // Swiping together also takes over the stage (following someone's scrolling comes first).
+  const swiping = !following && !!room.reels?.on;
+  if (following || swiping) {
     for (const id of ['#emptyStage', '#playerWrap', '#remotePoster', '#igWrap', '#streamCard', '#controls', '#startBar']) $(id).hidden = true;
   }
+  // On a phone, the call can float over the Netflix or Hulu app.
+  $('#popHint').hidden = !(kind === 'stream' && call?.active && popout?.supported && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent));
 
   if ((cur?.id ?? null) !== lastItemId) {
     lastItemId = cur?.id ?? null;
@@ -583,7 +594,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------- queue ----------
-const KIND_LABELS = { youtube: 'YouTube', vimeo: 'Vimeo', file: 'Video link', jellyfin: 'Jellyfin', plex: 'Plex', instagram: 'Instagram', local: 'Video file' };
+const KIND_LABELS = { youtube: 'YouTube', vimeo: 'Vimeo', tiktok: 'TikTok', file: 'Video link', jellyfin: 'Jellyfin', plex: 'Plex', instagram: 'Instagram', local: 'Video file' };
 function kindLabel(it) {
   if (it.kind === 'twitch') return it.live ? 'Twitch, live' : 'Twitch';
   if (KIND_LABELS[it.kind]) return KIND_LABELS[it.kind];
@@ -592,7 +603,7 @@ function kindLabel(it) {
   return ep ? `${svc}, ${ep}` : svc;
 }
 
-const THUMB_TEXT = { vimeo: 'V', twitch: 'TW', jellyfin: 'JF', plex: 'PLEX', instagram: 'IG', local: 'FILE' };
+const THUMB_TEXT = { vimeo: 'V', twitch: 'TW', tiktok: 'TT', jellyfin: 'JF', plex: 'PLEX', instagram: 'IG', local: 'FILE' };
 function thumbFor(it) {
   const box = el('div', { class: `thumb thumb-${it.kind}` });
   const src = thumbUrl(it);
@@ -660,7 +671,8 @@ const SOURCES = [
   { label: 'Plex', placeholder: 'https://...plex.direct:32400/library/metadata/...', help: 'Open the movie or episode, choose Get Info, then View XML, and paste that page’s link. The link includes your Plex token, which works like your password. Safer: a Plex managed user that only sees this library.', warn: true },
   { label: 'Netflix', placeholder: 'https://www.netflix.com/watch/...', help: 'The episode or movie link. Syncs on its own when everyone uses the Couchline extension on a computer, otherwise a shared countdown.' },
   { label: 'Hulu', placeholder: 'https://www.hulu.com/watch/...', help: 'The episode or movie link. Syncs on its own when everyone uses the Couchline extension on a computer, otherwise a shared countdown.' },
-  { label: 'Instagram', placeholder: 'https://www.instagram.com/reel/...', help: 'A reel or post link. Starts on a shared countdown.' },
+  { label: 'Instagram', placeholder: 'https://www.instagram.com/reel/...', help: 'A reel or post link. Starts on a shared countdown. Got several? Use Swipe together below to go through them as one.' },
+  { label: 'TikTok', placeholder: 'https://www.tiktok.com/@.../video/...', help: 'A TikTok video link, including the short ones from the Share button. Plays here, in sync. Got several? Use Swipe together below.' },
 ];
 $('#sourceChips').append(...SOURCES.map((src) => el('button', {
   type: 'button', class: 'chip', 'aria-pressed': 'false',
@@ -791,6 +803,7 @@ const SOURCE_HINTS = {
   jellyfin: 'Jellyfin. Plays here, in sync.',
   plex: 'Plex. Plays here, in sync.',
   instagram: 'Instagram. Starts on a shared countdown.',
+  tiktok: 'TikTok. Plays here, in sync.',
 };
 function sourceHint(m) {
   if (m.kind === 'twitch') return m.live ? 'Twitch live stream. Plays here. Play and pause are shared; seeking is off for live.' : 'Twitch video. Plays here, in sync.';
@@ -980,10 +993,18 @@ function renderCallButtons() {
   $('#camBtn').hidden = !call.active || !call.camOn;
   $('#camOnBtn').hidden = !call.active || call.camOn || !call.videoAllowed;
   $('#leaveCallBtn').hidden = !call.active;
+  $('#popOutBtn').hidden = !(popout?.available() || popout?.active);
+  $('#popOutBtn').textContent = popout?.active ? 'Pop back in' : 'Pop out';
+  popout?.syncSession();
   const waiting = call.active && !call.videoAllowed;
   $('#callNote').hidden = !waiting;
   if (waiting) $('#callNote').textContent = 'Five cameras are on, so you’re on audio. You’ll get a Turn camera on button when a spot opens.';
 }
+$('#popOutBtn').addEventListener('click', async () => {
+  const ok = await popout.toggle();
+  if (ok === false) toast({ text: 'This browser can’t pop the call out. Try Chrome, or Safari on iPhone.' });
+  renderCallButtons();
+});
 $('#camOnBtn').addEventListener('click', async () => {
   if (!(await call.enableCamera())) toast({ text: 'The camera couldn’t start. It may be blocked or busy in another app.' });
   renderCallButtons();

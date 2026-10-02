@@ -74,12 +74,22 @@ r = await c.ask('queue:add', { input: 'https://clips.twitch.tv/SomeClip' });
 assert.match(r.error, /clips/);
 ok('Jellyfin link comes back with a token warning; Plex web and Twitch clip links explain why not');
 
+// TikTok plays in the box, synced.
+r = await c.ask('queue:add', { input: 'https://www.tiktok.com/@scout2015/video/6718335390845095173', playNow: true });
+assert.ok(r.ok);
+await wait(80);
+assert.deepEqual([a.last.current.kind, a.last.current.videoId], ['tiktok', '6718335390845095173']);
+await wait(3200); // its countdown
+a.emit('cmd:seek', { position: 5 }); await wait(50);
+assert.equal(c.last.playback.position, 5, 'TikTok shares seeks like any synced video');
+ok('TikTok links play in the box, synced');
+
 // A returning viewer's saved copy restores the new kinds too.
 const saved = { queue: a.last.queue, shows: [], current: a.last.current };
 const d = client(PORT, 'Gaytan', 'sources-room-2', { cache: saved });
 await d.joined; await wait(50);
 assert.deepEqual(d.last.queue.map((q) => q.kind), saved.queue.map((q) => q.kind));
-assert.equal(d.last.current.kind, 'file');
+assert.equal(d.last.current.kind, saved.current.kind);
 ok('saved queues with the new kinds restore');
 
 // Files from people's own devices: only a description is shared.

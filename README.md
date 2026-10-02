@@ -7,6 +7,7 @@ Watch together from different places, on computers and phones (and a TV browser 
 | YouTube | Fully synced. Play, pause, and seeking are shared, and the app keeps both screens within about half a second. |
 | Vimeo | Fully synced, inside the video box. Speed nudges and hidden controls only work on videos whose owner pays for Vimeo; other videos catch up by seeking. |
 | Twitch | Past broadcasts (twitch.tv/videos/...) are fully synced. Live channels share play and pause; seeking is off because live has no shared timeline. Clips aren't supported. Twitch's own buttons stay usable, and pressing them moves the whole room. |
+| TikTok | Videos play in the video box, synced, through TikTok's official embed player. Short share links (vm.tiktok.com) work. Photo posts aren't supported. |
 | Video links | Direct .mp4, .webm, and .m3u8 (HLS) links play in the video box, fully synced. |
 | Jellyfin and Plex | Stream links play in the video box, fully synced. See "Jellyfin and Plex links" below before sharing one. |
 | Video files on your device | Pick a file and it plays from your device, fully synced. Nothing is uploaded. Everyone else picks their own copy, or gets it straight from someone who has it, browser to browser. Downloaded copies are kept in the browser (the last 3) so a reload doesn't download again. |
@@ -41,7 +42,9 @@ The free quota allows about 100 searches a day; results are cached for 10 minute
 - **Played:** everything that was on stays at the bottom of Up next, newest first, with Play again and Add back. Files from your device too.
 - **Jinx:** send the same reaction at the same moment and it bursts.
 - **Stepped away:** the roster shows who has switched away from Couchline. Turn on "Pause when someone steps away" in the room menu to pause after 8 seconds.
-- **Instagram follow:** on a computer with the extension, tap Share my scrolling on Instagram, and as you move from reel to reel, the room sees the same one in Couchline (on any device). Phones can't run extensions, so from a phone, share reels one at a time with the share sheet.
+- **Swipe together:** a deck of Instagram reels and TikToks everyone swipes through as one. Whoever swipes is driving and everyone's screen follows. Reels and TikToks already in Up next move into the deck, and anything shared while it's on (phone share sheet, Paste, chat) joins it. Each person taps the video to play it.
+- **Pop out the call:** on phones and computers, Pop out floats everyone's faces in a small window that stays on top while you switch to the Netflix, Hulu, or Instagram app. With one other person their video floats; with more, everyone is drawn together with their colors and names. Where the browser supports it (Chrome), the floating window has mute, camera, and hang up, and the call pops out by itself when you switch away.
+- **Instagram and TikTok follow:** on a computer with the extension, tap Share my scrolling on Instagram or TikTok, and as you move from reel to reel, the room sees the same one in Couchline (on any device). Phones can't run extensions, so from a phone, share reels one at a time with the share sheet.
 - **Your camera:** your own picture is mirrored like a mirror (only on your screen). Turn it off under Camera and mic.
 
 Up next has three ways to add something (paste a link, pick a file, type a show), and every source is listed under the link box with how to get its link.

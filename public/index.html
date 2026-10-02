@@ -124,6 +124,27 @@
             <iframe id="igFrame" title="Instagram video" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
           </div>
 
+          <div id="swipeWrap" class="swipe-wrap" hidden>
+            <div class="swipe-bar">
+              <span class="swipe-label">Swipe together</span>
+              <span id="swipePos" class="swipe-pos"></span>
+              <span id="swipeDriver" class="swipe-driver"></span>
+              <button id="swipeRemove" class="btn btn-quiet btn-small">Remove</button>
+              <button id="swipeEnd" class="btn btn-small">End</button>
+            </div>
+            <div class="swipe-body">
+              <button id="swipeBack" class="swipe-nav" aria-label="Back one">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6l-7 7 1.4 1.4L12 8.8l5.6 5.6L19 13z"/></svg><span>Back</span>
+              </button>
+              <iframe id="swipeFrame" title="The reel or TikTok everyone is on" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+              <p id="swipeEmpty" class="swipe-empty" hidden>Nothing to swipe yet. Share reels or TikToks to Couchline from your phone, or paste their links in Up next.</p>
+              <button id="swipeNext" class="swipe-nav" aria-label="Next one">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18l7-7-1.4-1.4L12 15.2 6.4 9.6 5 11z"/></svg><span>Next</span>
+              </button>
+            </div>
+            <p id="swipeFrom" class="swipe-from"></p>
+          </div>
+
           <div id="followWrap" class="ig-wrap follow-wrap" hidden>
             <p class="follow-banner">
               <span id="followWho"></span>
@@ -138,6 +159,7 @@
             <p id="streamService" class="stream-service"></p>
             <h2 id="streamTitle" class="stream-title"></h2>
             <p id="streamEp" class="stream-ep"></p>
+            <p id="popHint" class="hint pop-hint" hidden>Watching in the app? Tap Pop out on the call first, and everyone stays on screen while you watch.</p>
             <p id="streamHint" class="hint">Open it on your own screen and pause at the start. When everyone’s ready, tap Start together.</p>
             <p id="extNote" class="hint ext-note" hidden></p>
             <p><a id="extGet" class="btn btn-small ext-room-link" href="/extension" hidden>Get the extension</a></p>
@@ -202,6 +224,7 @@
             <button id="camBtn" class="btn btn-small" hidden>Camera off</button>
             <button id="camOnBtn" class="btn btn-small" hidden>Turn camera on</button>
             <button id="devicesBtn" class="btn btn-small" aria-expanded="false" aria-controls="devicePanel">Camera and mic</button>
+            <button id="popOutBtn" class="btn btn-small" hidden title="Keep everyone on screen while you use another app">Pop out</button>
             <button id="leaveCallBtn" class="btn btn-quiet btn-small" hidden>Leave call</button>
           </div>
           <div class="view-buttons">
@@ -296,6 +319,14 @@
             <label for="showAddEp" class="sr">Episode</label>
             <select id="showAddEp" hidden></select>
             <p class="note">For something each of you opens on your own screen. You’ll start it together with a countdown. Show search by <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>.</p>
+          </div>
+
+          <div id="swipeCard" class="swipe-card">
+            <div>
+              <p class="swipe-title">Swipe together</p>
+              <p id="swipeCount" class="note"></p>
+            </div>
+            <button id="swipeStart" class="btn btn-small">Start</button>
           </div>
 
           <ol id="queue" class="queue"></ol>

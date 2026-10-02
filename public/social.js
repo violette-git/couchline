@@ -284,7 +284,7 @@ export function initSocial({ socket, clientId, getRoom, expectedNow, durationNow
   // ---------- watched together ----------
   // Everything you actually played together, whatever it was, newest first. Ratings show
   // once they're revealed.
-  const THUMB_TEXT = { instagram: 'IG', twitch: 'TW', vimeo: 'V', file: 'VIDEO', local: 'FILE', jellyfin: 'JF', plex: 'PLEX' };
+  const THUMB_TEXT = { instagram: 'IG', tiktok: 'TT', twitch: 'TW', vimeo: 'V', file: 'VIDEO', local: 'FILE', jellyfin: 'JF', plex: 'PLEX' };
   function renderHistory(room) {
     const list = $('#historyList');
     if (!room.history.length) {
@@ -324,12 +324,16 @@ export function initSocial({ socket, clientId, getRoom, expectedNow, durationNow
       followCode = null;
       return;
     }
-    $('#followWho').textContent = `Following ${f.name}’s Instagram`;
+    const tiktok = f.kind === 'tiktok';
+    $('#followWho').textContent = `Following ${f.name}’s ${tiktok ? 'TikTok' : 'Instagram'}`;
     $('#followWrap').dataset.color = f.color || '';
     $('#followOpen').href = f.url;
+    $('#followOpen').textContent = tiktok ? 'Open in TikTok' : 'Open in Instagram';
     if (f.code !== followCode) {
       followCode = f.code;
-      $('#followFrame').src = `https://www.instagram.com/${f.igType}/${f.code}/embed/`;
+      $('#followFrame').src = tiktok
+        ? `https://www.tiktok.com/player/v1/${f.videoId}?music_info=1&description=1&rel=0`
+        : `https://www.instagram.com/${f.igType}/${f.code}/embed/`;
     }
   }
 

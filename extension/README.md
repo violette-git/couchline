@@ -26,9 +26,9 @@ Chrome and Edge 111 or newer.
 
 ## Everywhere else
 
-- **Couchline button** on YouTube, Vimeo, Twitch, and Instagram: Play now or Add to Up next, for whatever you're looking at. It goes to the room you last joined (or the one set in the toolbar popup).
+- **Couchline button** on YouTube, Vimeo, Twitch, TikTok, and Instagram: Play now or Add to Up next, for whatever you're looking at. It goes to the room you last joined (or the one set in the toolbar popup).
 - **Right-click menu:** "Add to Couchline" and "Play now on Couchline" on any link or page. A check mark (or "!") on the toolbar button says how it went.
-- **Instagram, Share my scrolling:** as you move through reels, everyone in the room sees the same one in Couchline. Stop sharing from the same button; it also stops if you close the tab, and after 30 minutes without moving.
+- **Instagram and TikTok, Share my scrolling:** as you move through reels or videos, everyone in the room sees the same one in Couchline. On TikTok, open a video so the address bar shows it (the For You feed doesn't change the address). Stop sharing from the same button; it also stops if you close the tab, and after 30 minutes without moving.
 - **Sidebar chat** on Netflix and Hulu, with messages floating over the video while the sidebar is closed, and **Watch this together** to put the title you're on in front of everyone.
 
 These use the Couchline server's HTTP API (`/api/drop`, `/api/follow`). The room code is the only key, the same as joining by link.

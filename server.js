@@ -111,7 +111,7 @@ const fmt = (s) => {
 
 // Link parsing lives in public/media.js so the add form can preview links with the same rules.
 
-const DEFAULT_TITLES = { youtube: 'YouTube video', vimeo: 'Vimeo video', file: 'Video', jellyfin: 'Jellyfin video', plex: 'Plex video', local: 'Video file' };
+const DEFAULT_TITLES = { youtube: 'YouTube video', vimeo: 'Vimeo video', tiktok: 'TikTok video', file: 'Video', jellyfin: 'Jellyfin video', plex: 'Plex video', local: 'Video file' };
 const FINGERPRINT = /^[0-9a-f]{64}$/;
 const POSTER = /^https:\/\/static\.tvmaze\.com\/[\w./-]+$/; // show posters come from TVmaze
 // The Netflix or Hulu title in a watch link, used to tell episodes apart.
@@ -148,7 +148,7 @@ function cleanItem(raw) {
     if (!base.name || !base.size || !base.fp) return null;
   } else {
     base = parseMedia(raw.url);
-    if (!base?.kind || base.kind === 'stream') return null;
+    if (!base?.kind || base.kind === 'stream' || base.short) return null;
     if ('start' in base && !base.start && !base.live) base.start = num(raw.start, 0, 1e6, 0);
     if (base.kind === 'vimeo' && /^https:\/\/i\.vimeocdn\.com\/[\w./-]+$/.test(str(raw.thumb, 300))) base.thumb = str(raw.thumb, 300);
   }
@@ -183,6 +183,7 @@ function cleanShow(raw) {
 const OEMBED = {
   youtube: (it) => `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(it.url)}`,
   vimeo: (it) => `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(it.url)}`,
+  tiktok: (it) => `https://www.tiktok.com/oembed?url=${encodeURIComponent(it.url)}`,
 };
 async function oembed(item) {
   try {
@@ -190,7 +191,9 @@ async function oembed(item) {
     if (!r.ok) return null;
     const j = await r.json();
     const thumb = str(j.thumbnail_url, 300);
-    return { title: str(j.title, 140) || null, thumb: /^https:\/\/i\.vimeocdn\.com\//.test(thumb) ? thumb : null };
+    // TikTok titles are the caption, which can be empty; then it's named after its author.
+    const title = str(j.title, 140) || (item.kind === 'tiktok' && j.author_name ? `TikTok by ${str(j.author_name, 60)}` : '');
+    return { title: title || null, thumb: /^https:\/\/i\.vimeocdn\.com\//.test(thumb) ? thumb : null };
   } catch {
     return null;
   }
@@ -209,6 +212,8 @@ function getRoom(roomId) {
       countdownTimer: null, cleanup: null, driftTimer: null, extSyncFor: null,
       chat: [], moments: [], ready: null, rating: null, ratingTimer: null, history: [], follow: null, played: [],
       settings: { pauseOnAway: false },
+      // Reels together: a deck of Instagram reels everyone swipes through as one.
+      reels: { on: false, items: [], index: 0, driver: null },
     };
     rooms.set(roomId, room);
   }
@@ -279,6 +284,7 @@ function publicState(room) {
     rating: publicRating(room.rating),
     history: room.history,
     follow: room.follow,
+    reels: { ...room.reels, driverName: room.members.get(room.reels.driver)?.name || null },
     settings: room.settings,
     serverNow: Date.now(),
   };
@@ -453,6 +459,8 @@ function adoptCache(room, cache) {
   room.chat = Array.isArray(cache.chat) ? cache.chat.slice(-100).map(cleanChat).filter(Boolean) : [];
   room.history = Array.isArray(cache.history) ? cache.history.slice(0, 50).map(cleanHistory).filter(Boolean) : [];
   room.played = Array.isArray(cache.played) ? cache.played.slice(0, PLAYED_MAX).map(cleanItem).filter(Boolean) : [];
+  const reels = Array.isArray(cache.reels) ? cache.reels.slice(0, REELS_MAX) : [];
+  room.reels.items = reels.map((r) => reelItem(parseMedia(r?.url), { name: str(r?.addedBy, 24) || 'Someone', color: MEMBER_COLORS.includes(r?.color) ? r.color : null })).filter(Boolean);
   const cur = cleanItem(cache.current);
   if (cur) setCurrent(room, cur);
 }
@@ -483,9 +491,31 @@ function cleanHistory(h) {
 
 // Puts a pasted link (or a show name) into a room. Used by the add form, the extension's
 // "Add to Couchline", and the phone share sheet.
-function addToRoom(room, { input, service, title, asName, playNow, poster, season, episode }, by) {
-  const media = asName ? (str(input, 120) ? { kind: 'stream', title: str(input, 120) } : null) : parseMedia(input);
+// TikTok's share button gives short links (vm.tiktok.com/...). They redirect to the video.
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
+async function resolveShort(media) {
+  if (media?.kind !== 'tiktok' || !media.short) return media;
+  try {
+    const r = await fetch(media.url, { redirect: 'follow', headers: { 'User-Agent': BROWSER_UA }, signal: AbortSignal.timeout(6000) });
+    r.body?.cancel().catch(() => {});
+    const found = parseMedia(r.url);
+    if (found?.kind === 'tiktok' && found.videoId) return found;
+  } catch { /* falls through to the message below */ }
+  return { error: 'That TikTok link didn’t open a video. Copy the link again from TikTok.' };
+}
+
+async function addToRoom(room, { input, service, title, asName, playNow, poster, season, episode }, by) {
+  let media = asName ? (str(input, 120) ? { kind: 'stream', title: str(input, 120) } : null) : parseMedia(input);
+  media = await resolveShort(media);
   if (media?.error) return { error: media.error };
+  // While swiping together is on, reels and TikToks join the deck instead of Up next.
+  if ((media?.kind === 'instagram' || media?.kind === 'tiktok') && room.reels.on) {
+    const added = addReel(room, media, by);
+    if (!added) return { error: 'That one is already in the deck.' };
+    broadcast(room);
+    toast(room, `${by.name} added ${media.kind === 'tiktok' ? 'a TikTok' : 'a reel'}`, by);
+    return { ok: true, item: { title: media.kind === 'tiktok' ? 'TikTok' : 'Instagram reel' }, warnings: [] };
+  }
   if (!media) return { error: 'That link isn’t supported. Paste a YouTube, Vimeo, Twitch, Instagram, Netflix, Hulu, Jellyfin, Plex, or video file link, or type a show name.' };
   if (room.queue.length >= 100) return { error: 'Up next is full. Remove something first.' };
   const item = cleanItem({ ...media, service: media.service || service, title: media.title || str(title, 140), addedBy: by.name, poster, season, episode });
@@ -509,6 +539,23 @@ function addToRoom(room, { input, service, title, asName, playNow, poster, seaso
   }
   return { ok: true, item, warnings: mediaWarnings(item) };
 }
+// ---------- reels together ----------
+const REELS_MAX = 200;
+// The deck holds Instagram reels and posts, and TikToks.
+function reelItem(media, by) {
+  if (media?.kind === 'instagram') return { id: newId(), kind: 'instagram', code: media.code, igType: media.igType, url: media.url, addedBy: by.name, color: by.color || null };
+  if (media?.kind === 'tiktok' && media.videoId) return { id: newId(), kind: 'tiktok', videoId: media.videoId, url: media.url, addedBy: by.name, color: by.color || null };
+  return null;
+}
+const swipeable = (it) => it?.kind === 'instagram' || it?.kind === 'tiktok';
+function addReel(room, media, by) {
+  const key = media.code || media.videoId;
+  if (room.reels.items.some((r) => (r.code || r.videoId) === key)) return false;
+  room.reels.items.push(reelItem(media, by));
+  if (room.reels.items.length > REELS_MAX) room.reels.items.shift();
+  return true;
+}
+
 // "Play now": the current item gets rated if it was watched, and the new one starts on a countdown.
 function advanceTo(room, item, by) {
   startRating(room, room.current);
@@ -519,15 +566,18 @@ function advanceTo(room, item, by) {
 // Someone shared their Instagram scrolling (from the extension): show that post to the room.
 function followTo(room, url, by) {
   const media = parseMedia(url);
-  if (media?.kind !== 'instagram') return { error: 'Only Instagram posts and reels can be followed.' };
+  if (media?.kind !== 'instagram' && !(media?.kind === 'tiktok' && media.videoId)) return { error: 'Only Instagram and TikTok posts can be followed.' };
   const starting = !room.follow;
   if (starting && synced(room) && room.playback.playing) setPlayback(room, false, posNow(room));
-  room.follow = { name: by.name, color: by.color || null, url: media.url, igType: media.igType, code: media.code, at: Date.now() };
+  room.follow = {
+    name: by.name, color: by.color || null, kind: media.kind, url: media.url,
+    igType: media.igType || null, code: media.code || media.videoId, videoId: media.videoId || null, at: Date.now(),
+  };
   // If the sharer closes Instagram without stopping, sharing ends after a while on its own.
   clearTimeout(room.followTimer);
   room.followTimer = setTimeout(() => { room.follow = null; broadcast(room); }, 30 * 60 * 1000);
   broadcast(room);
-  if (starting) toast(room, `${by.name} is sharing their Instagram scrolling`, by);
+  if (starting) toast(room, `${by.name} is sharing their ${media.kind === 'tiktok' ? 'TikTok' : 'Instagram'} scrolling`, by);
   return { ok: true };
 }
 
@@ -565,10 +615,10 @@ const apiBy = (room, req) => {
   const member = [...room.members.values()].find((m) => m.name.toLowerCase() === name.toLowerCase());
   return { name, color: member?.color || null };
 };
-app.post('/api/drop', (req, res) => {
+app.post('/api/drop', async (req, res) => {
   const room = apiRoom(req, res);
   if (!room) return;
-  const r = addToRoom(room, { input: req.body.input, playNow: !!req.body.play }, apiBy(room, req));
+  const r = await addToRoom(room, { input: req.body.input, playNow: !!req.body.play }, apiBy(room, req));
   res.status(r.error ? 400 : 200).json(r.error ? { error: r.error } : { ok: true, title: r.item.title, warnings: r.warnings });
 });
 app.post('/api/follow', (req, res) => {
@@ -774,8 +824,9 @@ io.on('connection', (socket) => {
   // ----- queue -----
   // "asName" comes from the Type a show box, so "S.W.A.T." isn't mistaken for a web address.
   on('queue:add', (d, cb) => {
-    const r = addToRoom(room, { input: d.input, service: d.service, title: d.title, asName: d.asName, playNow: d.playNow, poster: d.poster, season: d.season, episode: d.episode }, me);
-    cb(r.error ? { error: r.error } : { ok: true, warnings: r.warnings });
+    addToRoom(room, { input: d.input, service: d.service, title: d.title, asName: d.asName, playNow: d.playNow, poster: d.poster, season: d.season, episode: d.episode }, me)
+      .then((r) => cb(r.error ? { error: r.error } : { ok: true, warnings: r.warnings }))
+      .catch((err) => { console.error('queue:add', err); cb({ error: 'That couldn’t be added.' }); });
   });
   // A video file on the adder's device. Others pick their own copy or get it from someone who has it.
   on('queue:addLocal', (d, cb) => {
@@ -993,6 +1044,50 @@ io.on('connection', (socket) => {
 
   // Instagram follow, from a member's own connection (the HTTP API covers the extension).
   on('follow:goto', (d, cb) => cb(followTo(room, d.url, me)));
+  // Reels together. Reels waiting in Up next move into the deck; whoever swipes is driving,
+  // and everyone's screen shows the same reel.
+  on('reels:start', () => {
+    const r = room.reels;
+    const moving = room.queue.filter(swipeable);
+    room.queue = room.queue.filter((it) => !swipeable(it));
+    for (const it of moving) addReel(room, it, { name: it.addedBy || me.name, color: null });
+    if (swipeable(room.current)) addReel(room, room.current, { name: room.current.addedBy || me.name, color: null });
+    if (!r.on) {
+      r.on = true;
+      r.driver = me.id;
+      if (synced(room) && room.playback.playing) setPlayback(room, false, posNow(room));
+      toast(room, `${me.name} started swiping together`, me);
+    }
+    r.index = Math.min(r.index, Math.max(0, r.items.length - 1));
+    broadcast(room);
+  });
+  on('reels:go', (d) => {
+    const r = room.reels;
+    if (!r.on || !r.items.length) return;
+    r.index = Math.round(num(d.index, 0, r.items.length - 1, r.index));
+    r.driver = me.id;
+    broadcast(room);
+  });
+  on('reels:remove', (d) => {
+    const r = room.reels;
+    const i = r.items.findIndex((x) => x.id === d.id);
+    if (i < 0) return;
+    r.items.splice(i, 1);
+    if (r.index > i || r.index >= r.items.length) r.index = Math.max(0, r.index - 1);
+    broadcast(room);
+  });
+  on('reels:clear', () => {
+    room.reels.items = [];
+    room.reels.index = 0;
+    broadcast(room);
+  });
+  on('reels:stop', () => {
+    if (!room.reels.on) return;
+    room.reels.on = false;
+    broadcast(room);
+    toast(room, `${me.name} ended swiping together`, me);
+  });
+
   on('follow:stop', () => {
     if (!room.follow) return;
     room.follow = null;

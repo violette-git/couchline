@@ -1,12 +1,14 @@
-// Couchline extension: a small "Couchline" button on YouTube, Vimeo, Twitch, and Instagram.
+// Couchline extension: a small "Couchline" button on YouTube, Vimeo, Twitch, TikTok, and Instagram.
 // It adds what you're looking at to your room (or puts it on now), so nobody copies links.
-// On Instagram it can also share your scrolling: as you move from reel to reel, everyone in
+// On Instagram and TikTok it can also share your scrolling: as you move from one to the next, everyone in
 // the room sees the same one in Couchline.
 (() => {
   if (window.top !== window || window.__couchlineAnywhere) return;
   window.__couchlineAnywhere = true;
 
   const onInstagram = location.hostname.endsWith('instagram.com');
+  const onTikTok = location.hostname.endsWith('tiktok.com');
+  const scrollSite = onInstagram || onTikTok; // sites where you can share your scrolling
   let media = null; // lib/media.js, shared with the web app
   let host = null;
   let ui = null;
@@ -25,7 +27,7 @@
     const m = media.parseMedia(location.href);
     return m && !m.error && m.kind !== 'stream' ? m : null;
   }
-  const label = (m) => ({ youtube: 'this video', vimeo: 'this video', twitch: m.live ? 'this stream' : 'this video', instagram: m.igType === 'p' ? 'this post' : 'this reel' }[m.kind] || 'this');
+  const label = (m) => ({ youtube: 'this video', vimeo: 'this video', tiktok: 'this TikTok', twitch: m.live ? 'this stream' : 'this video', instagram: m.igType === 'p' ? 'this post' : 'this reel' }[m.kind] || 'this');
 
   async function build() {
     host = document.createElement('couchline-button');
@@ -74,9 +76,9 @@
   async function render() {
     if (!ui) return;
     const m = pageMedia();
-    // Only show up where there's something to add, or on Instagram for sharing your scrolling.
+    // Only show up where there's something to add, or on Instagram and TikTok for sharing your scrolling.
     // (The host resets all styles, so the hidden attribute wouldn't apply; set display instead.)
-    host.style.display = !m && !onInstagram && !open ? 'none' : 'block';
+    host.style.display = !m && !scrollSite && !open ? 'none' : 'block';
     ui.pill.textContent = sharing ? 'Couchline: sharing' : 'Couchline';
     ui.card.hidden = !open;
     if (!open) return;
@@ -91,13 +93,13 @@
         parts.at(-1).append(
           button('Play now', 'btn-primary', () => act({ t: 'drop', url: location.href, play: true }, 'Putting it on')),
           button('Add to Up next', '', () => act({ t: 'drop', url: location.href, play: false }, 'Added')));
-      } else if (!onInstagram) {
+      } else if (!scrollSite) {
         parts.push(p('Open a video to add it.', 'cl-note'));
       }
-      if (onInstagram) {
+      if (scrollSite) {
         parts.push(sharing
-          ? p('Sharing your scrolling. Everyone in the room sees each reel you land on.', 'cl-sharing')
-          : p('Share your scrolling: as you move through reels, the room follows along in Couchline.', 'cl-note'));
+          ? p(`Sharing your scrolling. Everyone in the room sees each ${onTikTok ? 'video' : 'reel'} you land on.`, 'cl-sharing')
+          : p(`Share your scrolling: as you move from one ${onTikTok ? 'video' : 'reel'} to the next, the room follows along in Couchline.${onTikTok ? ' Open a video so its address shows it.' : ''}`, 'cl-note'));
         parts.push(button(sharing ? 'Stop sharing' : 'Share my scrolling', sharing ? 'btn-quiet' : '', toggleSharing));
       }
     }
@@ -111,7 +113,7 @@
     render();
   }
 
-  // ---------- Instagram: share my scrolling ----------
+  // ---------- Instagram and TikTok: share my scrolling ----------
   async function toggleSharing() {
     sharing = !sharing;
     lastShared = null;
@@ -121,7 +123,7 @@
   }
   async function shareNow() {
     const m = pageMedia();
-    if (!sharing || !m || m.kind !== 'instagram' || m.url === lastShared) return;
+    if (!sharing || !m || !(m.kind === 'instagram' || (m.kind === 'tiktok' && m.videoId)) || m.url === lastShared) return;
     lastShared = m.url;
     const r = await send({ t: 'follow', url: m.url });
     if (r?.error) { notice = r.error; render(); }

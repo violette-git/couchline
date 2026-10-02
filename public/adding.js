@@ -8,7 +8,7 @@ const TVMAZE = 'https://api.tvmaze.com';
 const POSTER = /^https:\/\/static\.tvmaze\.com\//;
 const SHARE_KEY = 'pendingAdd';
 
-const LABELS = { youtube: 'YouTube video', vimeo: 'Vimeo video', twitch: 'Twitch video', file: 'Video link', jellyfin: 'Jellyfin video', plex: 'Plex video', instagram: 'Instagram', stream: 'link' };
+const LABELS = { youtube: 'YouTube video', vimeo: 'Vimeo video', tiktok: 'TikTok', twitch: 'Twitch video', file: 'Video link', jellyfin: 'Jellyfin video', plex: 'Plex video', instagram: 'Instagram', stream: 'link' };
 export const describe = (m) => (m.kind === 'stream' ? `${m.service} link` : m.kind === 'twitch' && m.live ? 'Twitch live stream' : LABELS[m.kind] || 'link');
 
 // A supported link inside some text (share sheets often send "Look at this! https://...").

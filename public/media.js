@@ -3,7 +3,7 @@
 
 // Kinds that play inside the video box and stay in sync on their own.
 // "local" is a file on each person's own device (see public/share.js); it never has a link.
-export const IN_BOX = ['youtube', 'vimeo', 'twitch', 'file', 'jellyfin', 'plex', 'local'];
+export const IN_BOX = ['youtube', 'vimeo', 'twitch', 'tiktok', 'file', 'jellyfin', 'plex', 'local'];
 // Services the Couchline browser extension can sync.
 export const EXT_SERVICES = ['Netflix', 'Hulu'];
 
@@ -102,6 +102,20 @@ export function parseMedia(raw) {
       return { kind: 'twitch', live: true, channel, url: `https://www.twitch.tv/${channel}`, start: 0 };
     }
     return { error: 'That Twitch link isn’t a video or a channel.' };
+  }
+
+  if (url && (host === 'tiktok.com' || host.endsWith('.tiktok.com'))) {
+    // Short share links (vm.tiktok.com/..., tiktok.com/t/...) point at a video the server
+    // looks up when the link is added.
+    if (host === 'vm.tiktok.com' || host === 'vt.tiktok.com' || segs[0] === 't') {
+      return { kind: 'tiktok', short: true, url: url.href };
+    }
+    if (segs[1] === 'photo') return { error: 'TikTok photo posts can’t be synced. Paste a TikTok video.' };
+    const m = url.pathname.match(/^\/@([^/]*)\/video\/(\d{10,25})/) || url.pathname.match(/^\/(?:embed\/v2|player\/v1)\/(\d{10,25})/);
+    const videoId = m ? m[m.length - 1] : (url.searchParams.get('share_item_id') || '').match(/^\d{10,25}$/)?.[0];
+    if (!videoId) return { error: 'That TikTok link isn’t a video.' };
+    const user = m && m.length === 3 && m[1] ? m[1] : '';
+    return { kind: 'tiktok', videoId, url: `https://www.tiktok.com/@${user}/video/${videoId}`, start: 0 };
   }
 
   if (url && host.endsWith('instagram.com')) {
