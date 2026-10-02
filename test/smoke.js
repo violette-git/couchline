@@ -43,7 +43,7 @@ r = await a.ask('queue:add', { input: 'instagram.com/reel/C8abcdEFG/?igsh=x' });
 assert.ok(r.ok);
 r = await a.ask('queue:add', { input: 'Severance S2E3', service: 'Hulu' });
 r = await a.ask('queue:add', { input: 'https://www.netflix.com/watch/81234567' });
-r = await a.ask('queue:add', { input: 'https://vimeo.com/123' });
+r = await a.ask('queue:add', { input: 'https://example.com/some/page' });
 assert.ok(r.error);
 await wait(50);
 assert.deepEqual(b.last.queue.map((q) => q.kind), ['instagram', 'stream', 'stream']);

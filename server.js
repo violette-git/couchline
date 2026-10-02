@@ -1,25 +1,86 @@
-// Couchline server: rooms, shared playback state, queue, show tracker,
-// buffering holds, and a relay for WebRTC call signaling.
+// Couchline server: rooms, shared playback state, queue, show tracker, buffering holds,
+// a relay for WebRTC call signaling, chat and the room's social extras, and a small HTTP
+// API so the browser extension and phone share sheets can add things without a link paste.
 import express from 'express';
 import http from 'node:http';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import { zipSync, strToU8 } from 'fflate';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
+import { parseMedia, mediaWarnings, IN_BOX, EXT_SERVICES } from './public/media.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 const ROOM_TTL_MS = 12 * 60 * 60 * 1000; // empty rooms are kept 12 hours
 const HOLD_LIMIT_MS = 20000; // stop waiting on a buffering viewer after 20s
-const MEMBER_COLORS = ['lamp', 'rose', 'sky', 'mint'];
+const MEMBER_COLORS = ['lamp', 'rose', 'sky', 'mint', 'lilac', 'lime', 'orchid', 'iris'];
+// Every person in the call connects to every other, so cameras are capped. The first five
+// people with a camera are on video; anyone past that is on audio until a spot opens.
+const VIDEO_SLOTS = 5;
 const SERVICES = ['Netflix', 'Hulu', 'Other'];
 const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
+// Twitch only plays inside pages on the domains listed here (comma separated, no scheme or port).
+const TWITCH_PARENT = (process.env.TWITCH_PARENT || 'localhost').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+// Optional: a YouTube Data API key turns on YouTube search inside Couchline.
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || '';
+const CHAT_MAX = 200;
+const AWAY_PAUSE_MS = Number(process.env.AWAY_PAUSE_MS ?? 8000); // "Pause when someone steps away" waits this long first
+const RATING_TIMEOUT_MS = 10 * 60 * 1000;
 
 const app = express();
 app.disable('x-powered-by');
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/config', (_req, res) => res.json({ iceServers: iceServers() }));
+app.use('/vendor/hls', express.static(path.join(__dirname, 'node_modules', 'hls.js', 'dist')));
+app.use('/vendor/qrcode', express.static(path.join(__dirname, 'node_modules', 'qrcode-generator')));
+app.get('/config', (_req, res) => res.json({ iceServers: iceServers(), twitchParent: TWITCH_PARENT, youtubeSearch: !!YOUTUBE_API_KEY }));
 app.get('/r/:roomId', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/rooms', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// The phone share sheet (Android, or an iPhone Shortcut) opens /share?url=..., and the page
+// adds it to the last room this device was in.
+app.get('/share', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+// ---------- the browser extension, as a download ----------
+// Zipped straight from the extension folder of whatever is deployed, so it's never stale.
+// The zip also carries this site's address (defaults.json), so the extension starts out
+// pointed at the right Couchline and people only add their room code and name.
+const EXT_DIR = path.join(__dirname, 'extension');
+const EXT_VERSION = JSON.parse(fs.readFileSync(path.join(EXT_DIR, 'manifest.json'), 'utf8')).version;
+let extFiles = null;
+function extensionFiles() {
+  if (extFiles) return extFiles;
+  extFiles = {};
+  const walk = (dir) => {
+    for (const name of fs.readdirSync(dir)) {
+      const full = path.join(dir, name);
+      if (fs.statSync(full).isDirectory()) walk(full);
+      else extFiles[`couchline-extension/${path.relative(EXT_DIR, full).split(path.sep).join('/')}`] = new Uint8Array(fs.readFileSync(full));
+    }
+  };
+  walk(EXT_DIR);
+  return extFiles;
+}
+const extZips = new Map(); // site address -> zip
+function extensionZip(origin) {
+  if (!extZips.has(origin)) {
+    if (extZips.size > 20) extZips.clear();
+    const defaults = strToU8(`${JSON.stringify({ server: origin }, null, 2)}\n`);
+    extZips.set(origin, Buffer.from(zipSync({ ...extensionFiles(), 'couchline-extension/defaults.json': defaults }, { level: 9 })));
+  }
+  return extZips.get(origin);
+}
+const siteOrigin = (req) => {
+  const proto = (req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim();
+  const host = str(req.get('host'), 200).replace(/[^\w.:-]/g, '');
+  return `${proto === 'https' ? 'https' : 'http'}://${host}`;
+};
+app.get('/couchline-extension.zip', (req, res) => {
+  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="couchline-extension.zip"', 'Cache-Control': 'no-cache' });
+  res.send(extensionZip(siteOrigin(req)));
+});
+app.get('/extension', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'extension.html')));
+app.get('/extension/info', (req, res) => res.json({ version: EXT_VERSION, size: extensionZip(siteOrigin(req)).length }));
 
 const server = http.createServer(app);
 const io = new Server(server, { pingInterval: 10000, pingTimeout: 8000, maxHttpBufferSize: 1e5 });
@@ -49,44 +110,16 @@ const fmt = (s) => {
   return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
 };
 
-// Turns whatever someone pasted into a media descriptor, or null if unsupported.
-export function parseMedia(raw) {
-  const input = str(raw, 500);
-  if (!input) return null;
-  let url = null;
-  if (!/\s/.test(input)) {
-    try { url = new URL(/^https?:\/\//i.test(input) ? input : `https://${input}`); } catch { url = null; }
-  }
-  const host = url ? url.hostname.replace(/^(www\.|m\.)/, '') : '';
+// Link parsing lives in public/media.js so the add form can preview links with the same rules.
 
-  if (url && (host === 'youtu.be' || host.endsWith('youtube.com'))) {
-    let videoId = host === 'youtu.be' ? url.pathname.slice(1) : url.searchParams.get('v');
-    if (!videoId) {
-      const m = url.pathname.match(/^\/(shorts|live|embed)\/([\w-]{6,})/);
-      if (m) videoId = m[2];
-    }
-    videoId = (videoId || '').split('/')[0];
-    if (/^[\w-]{6,20}$/.test(videoId)) {
-      const t = (url.searchParams.get('t') || '').replace(/s$/, '');
-      return { kind: 'youtube', videoId, url: `https://www.youtube.com/watch?v=${videoId}`, start: num(t, 0, 1e6, 0) };
-    }
-    return null;
-  }
-  if (url && host.endsWith('instagram.com')) {
-    const m = url.pathname.match(/^\/(reels?|p|tv)\/([\w-]{5,})/);
-    if (!m) return null;
-    const igType = m[1] === 'p' ? 'p' : 'reel';
-    return { kind: 'instagram', igType, code: m[2], url: `https://www.instagram.com/${igType}/${m[2]}/` };
-  }
-  if (url && (host.endsWith('netflix.com') || host.endsWith('hulu.com'))) {
-    return { kind: 'stream', service: host.endsWith('netflix.com') ? 'Netflix' : 'Hulu', url: url.href };
-  }
-  if (url && input.includes('.')) return null; // some other website we can't sync
-  return { kind: 'stream', title: input.slice(0, 120) }; // typed a show or movie name
-}
-
+const DEFAULT_TITLES = { youtube: 'YouTube video', vimeo: 'Vimeo video', tiktok: 'TikTok video', file: 'Video', jellyfin: 'Jellyfin video', plex: 'Plex video', local: 'Video file' };
+const FINGERPRINT = /^[0-9a-f]{64}$/;
+const POSTER = /^https:\/\/static\.tvmaze\.com\/[\w./-]+$/; // show posters come from TVmaze
+// The Netflix or Hulu title in a watch link, used to tell episodes apart.
+const watchId = (url) => (String(url || '').match(/\/watch\/([\w-]+)/) || [])[1] || null;
 function defaultTitle(m) {
-  if (m.kind === 'youtube') return 'YouTube video';
+  if (DEFAULT_TITLES[m.kind]) return DEFAULT_TITLES[m.kind];
+  if (m.kind === 'twitch') return m.live ? `${m.channel} on Twitch` : 'Twitch video';
   if (m.kind === 'instagram') return m.igType === 'p' ? 'Instagram post' : 'Instagram reel';
   return m.service ? `${m.service} title` : 'Untitled';
 }
@@ -101,11 +134,24 @@ function cleanItem(raw) {
       kind: 'stream',
       service: SERVICES.includes(raw.service) ? raw.service : linked?.service || null,
       url: linked?.kind === 'stream' && linked.url ? linked.url : null,
+      poster: POSTER.test(str(raw.poster, 300)) ? str(raw.poster, 300) : null,
     };
+  } else if (raw.kind === 'local') {
+    // A file on each person's own device. Only its description is shared, never the file.
+    base = {
+      kind: 'local',
+      name: str(raw.name, 200),
+      size: num(raw.size, 0, 1e13, 0),
+      fp: FINGERPRINT.test(raw.fp) ? raw.fp : null,
+      mime: /^video\/[\w.+-]{1,40}$/.test(raw.mime) ? raw.mime : null,
+      start: 0,
+    };
+    if (!base.name || !base.size || !base.fp) return null;
   } else {
     base = parseMedia(raw.url);
-    if (!base || base.kind === 'stream') return null;
-    if (base.kind === 'youtube' && !base.start) base.start = num(raw.start, 0, 1e6, 0);
+    if (!base?.kind || base.kind === 'stream' || base.short) return null;
+    if ('start' in base && !base.start && !base.live) base.start = num(raw.start, 0, 1e6, 0);
+    if (base.kind === 'vimeo' && /^https:\/\/i\.vimeocdn\.com\/[\w./-]+$/.test(str(raw.thumb, 300))) base.thumb = str(raw.thumb, 300);
   }
   return {
     ...base,
@@ -130,15 +176,25 @@ function cleanShow(raw) {
     season: num(raw.season, 1, 99, 1),
     episode: num(raw.episode, 1, 999, 1),
     updatedBy: str(raw.updatedBy, 24) || null,
+    poster: POSTER.test(str(raw.poster, 300)) ? str(raw.poster, 300) : null,
   };
 }
 
-async function youtubeTitle(videoId) {
+// Title (and for Vimeo, a thumbnail) from the site's public oEmbed endpoint.
+const OEMBED = {
+  youtube: (it) => `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(it.url)}`,
+  vimeo: (it) => `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(it.url)}`,
+  tiktok: (it) => `https://www.tiktok.com/oembed?url=${encodeURIComponent(it.url)}`,
+};
+async function oembed(item) {
   try {
-    const url = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(OEMBED[item.kind](item), { signal: AbortSignal.timeout(3000) });
     if (!r.ok) return null;
-    return str((await r.json()).title, 140) || null;
+    const j = await r.json();
+    const thumb = str(j.thumbnail_url, 300);
+    // TikTok titles are the caption, which can be empty; then it's named after its author.
+    const title = str(j.title, 140) || (item.kind === 'tiktok' && j.author_name ? `TikTok by ${str(j.author_name, 60)}` : '');
+    return { title: title || null, thumb: /^https:\/\/i\.vimeocdn\.com\//.test(thumb) ? thumb : null };
   } catch {
     return null;
   }
@@ -152,9 +208,16 @@ function getRoom(roomId) {
   if (!room) {
     room = {
       id: roomId, fresh: true, current: null, queue: [], shows: [], countdown: null,
-      playback: { playing: false, position: 0, at: Date.now() },
+      playback: { playing: false, position: 0, at: Date.now(), fresh: true },
       members: new Map(), holds: new Map(), heldPause: false,
-      countdownTimer: null, cleanup: null, driftTimer: null,
+      countdownTimer: null, cleanup: null, driftTimer: null, extSyncFor: null,
+      chat: [], moments: [], ready: null, rating: null, ratingTimer: null, history: [], follow: null, played: [],
+      settings: { pauseOnAway: false },
+      // Reels together: a deck of Instagram reels everyone swipes through as one.
+      reels: { on: false, items: [], index: 0, driver: null },
+      // Title and who can find the room. Private rooms are joined by code or link only;
+      // public rooms are listed in the directory while someone is in them.
+      title: null, visibility: 'private', host: null,
     };
     rooms.set(roomId, room);
   }
@@ -168,27 +231,109 @@ const posNow = (room) => {
   const p = room.playback;
   return p.playing ? p.position + Math.max(0, Date.now() - p.at) / 1000 : p.position;
 };
-const setPlayback = (room, playing, position, at = Date.now()) => {
-  room.playback = { playing, position: Math.max(0, position), at };
+// "fresh" means nobody has pressed play, pause, or seek on this item yet. The extension
+// uses it to leave each person where they are until someone starts playback.
+const setPlayback = (room, playing, position, at = Date.now(), fresh = false) => {
+  room.playback = { playing, position: Math.max(0, position), at, fresh };
+  // Played for real (not just scheduled by a countdown), so it gets a rating when it ends.
+  if (playing && room.current && at <= Date.now()) markWatched(room, room.current);
 };
 
+const inBox = (room) => IN_BOX.includes(room.current?.kind);
+// A Netflix or Hulu item plays in sync when every viewer (everyone who isn't a remote)
+// is in the room through the Couchline extension on that service.
+function extSynced(room) {
+  const cur = room.current;
+  if (cur?.kind !== 'stream' || !EXT_SERVICES.includes(cur.service)) return false;
+  const viewers = [...room.members.values()].filter((m) => !m.remote);
+  return viewers.length > 0 && viewers.every((m) => m.ext === cur.service);
+}
+// Synced means the server's playback state drives every screen.
+const synced = (room) => inBox(room) || extSynced(room);
+// Whether this member's screen is playing the current item, so their dropping off should pause the room.
+function isWatching(room, m) {
+  if (m.remote) return false;
+  if (inBox(room)) return !m.ext;
+  return extSynced(room);
+}
+
+// Camera spots go to people with a camera, in the order they joined the call.
+function videoSeats(room) {
+  return new Set([...room.members.values()]
+    .filter((m) => m.inCall && m.cam)
+    .sort((a, b) => a.callSince - b.callSince)
+    .slice(0, VIDEO_SLOTS)
+    .map((m) => m.id));
+}
+
+// The host controls the title and private or public. If the host isn't here, whoever has
+// been in the room longest stands in, so a room never gets stuck.
+function hostOf(room) {
+  if (room.host && room.members.has(room.host)) return room.host;
+  const longest = [...room.members.values()].sort((a, b) => a.joinedAt - b.joinedAt)[0];
+  return longest?.id || null;
+}
+
 function publicState(room) {
+  const onVideo = videoSeats(room);
+  const host = hostOf(room);
   return {
     id: room.id,
+    title: room.title,
+    visibility: room.visibility,
+    host,
+    hostName: room.members.get(host)?.name || null,
     current: room.current,
     playback: room.playback,
+    extSync: extSynced(room),
     queue: room.queue,
+    played: room.played,
     shows: room.shows,
     countdown: room.countdown,
     members: [...room.members.values()].map((m) => ({
-      id: m.id, name: m.name, color: m.color, remote: m.remote, inCall: m.inCall, drift: m.drift,
+      id: m.id, name: m.name, color: m.color, remote: m.remote, ext: m.ext, inCall: m.inCall, drift: m.drift, files: m.files, away: m.away,
+      video: m.inCall ? onVideo.has(m.id) : null,
+      camOn: m.inCall ? !!m.live : null,
     })),
     holds: [...room.holds.keys()].map((cid) => room.members.get(cid)?.name).filter(Boolean),
+    moments: room.moments,
+    ready: room.ready,
+    rating: publicRating(room.rating),
+    history: room.history,
+    follow: room.follow,
+    reels: { ...room.reels, driverName: room.members.get(room.reels.driver)?.name || null },
+    settings: room.settings,
     serverNow: Date.now(),
   };
 }
-const broadcast = (room) => io.to(room.id).emit('state', publicState(room));
 const toast = (room, text, by) => io.to(room.id).emit('toast', { text, color: by?.color || null });
+
+// Scores stay hidden until everyone has answered, then reveal together.
+function publicRating(r) {
+  if (!r) return null;
+  const votes = Object.values(r.votes);
+  return {
+    itemId: r.itemId, item: r.item, revealed: r.revealed,
+    answered: votes.map((v) => v.id),
+    votes: r.revealed ? votes.filter((v) => v.score) : null,
+  };
+}
+function broadcast(room) {
+  // Extension sync turning on pauses the room without moving anyone, so nobody jumps to a
+  // stale position. The next play, from whoever presses it, brings everyone to that spot.
+  const extFor = extSynced(room) ? room.current.id : null;
+  if (extFor !== room.extSyncFor) {
+    if (extFor) {
+      clearHolds(room);
+      setPlayback(room, false, posNow(room), Date.now(), true);
+      toast(room, `Everyone has the extension, so ${room.current.service} is synced. Press play on ${room.current.service} to start everyone from your spot.`);
+    } else if (room.extSyncFor && room.extSyncFor === room.current?.id) {
+      toast(room, 'Not everyone is on the extension, so this one is back to the shared countdown.');
+    }
+    room.extSyncFor = extFor;
+  }
+  io.to(room.id).emit('state', publicState(room));
+}
 
 function pickColor(room) {
   const used = new Set([...room.members.values()].map((m) => m.color));
@@ -207,36 +352,110 @@ function clearHolds(room) {
   room.heldPause = false;
 }
 
+// Everything that was on stays in "Played", newest first, so it's easy to go back to.
+const PLAYED_MAX = 50;
+const sameThing = (a, b) => a.kind === b.kind && (a.fp || a.url || a.title) === (b.fp || b.url || b.title) && a.episode === b.episode && a.season === b.season;
+function archive(room, item) {
+  if (!item) return;
+  const { watched: _watched, ...kept } = item;
+  room.played = [kept, ...room.played.filter((p) => p.id !== item.id && !sameThing(p, item))].slice(0, PLAYED_MAX);
+}
+
 function setCurrent(room, item) {
   clearCountdown(room);
   clearHolds(room);
+  room.ready = null;
+  if (room.current && room.current !== item) archive(room, room.current);
   room.current = item;
-  setPlayback(room, false, item?.kind === 'youtube' ? item.start || 0 : 0);
+  for (const m of room.members.values()) m.drift = null; // drift was about the previous item
+  setPlayback(room, false, item?.start || 0, Date.now(), true);
 }
 
-// Both screens count down together. For YouTube the server schedules playback to begin at
-// launchAt, so each client starts on its own synced clock instead of waiting for a message.
-function startCountdown(room, seconds, by) {
+// Both screens count down together. For synced items the server schedules playback to begin
+// at launchAt, so each client starts on its own synced clock instead of waiting for a message.
+// "from" lets the extension start a fresh item from the starter's own spot.
+function startCountdown(room, seconds, by, from = null) {
   if (!room.current) return;
   clearCountdown(room);
   const launchAt = Date.now() + seconds * 1000;
   const itemId = room.current.id;
-  if (room.current.kind === 'youtube') setPlayback(room, true, room.playback.playing ? posNow(room) : room.playback.position, launchAt);
-  room.countdown = { launchAt, itemId, color: by?.color || null, by: by?.name || null };
+  if (synced(room)) {
+    const pos = room.playback.fresh && from != null ? from : room.playback.playing ? posNow(room) : room.playback.position;
+    setPlayback(room, true, pos, launchAt);
+  }
+  room.countdown = { launchAt, itemId, color: by?.color || null };
   room.countdownTimer = setTimeout(() => {
     room.countdownTimer = null;
     room.countdown = null;
+    // Synced items start playing now; countdown items (Netflix or Hulu without the extension,
+    // Instagram) are started by each person at this moment. Either way, it's being watched.
+    if (room.current?.id === itemId) markWatched(room, room.current);
     broadcast(room);
     io.to(room.id).emit('go', { itemId });
   }, seconds * 1000);
 }
 
+// A Netflix or Hulu episode from the Shows tab finished, so the show moves on one episode.
+function finishEpisode(room, item, by) {
+  const show = item?.showId && room.shows.find((s) => s.id === item.showId);
+  if (!show || item.kind !== 'stream') return;
+  show.episode = Math.min(999, (item.episode || show.episode) + 1);
+  show.updatedBy = by?.name || null;
+}
+
+// Starts the current item from the top, playing or paused as before (used when an episode rolls on).
+function keepPlaying(room, playing = true) {
+  setPlayback(room, playing, 0);
+  room.extSyncFor = extSynced(room) ? room.current.id : null; // skip the "sync just turned on" pause
+}
+
+// When something everyone actually watched ends, everyone rates it; scores reveal together.
+// What the Watched list and ratings keep about an item.
+const snapshot = (item) => ({
+  id: item.id, title: item.title, kind: item.kind, videoId: item.videoId || null, thumb: item.thumb || null, poster: item.poster || null,
+  service: item.service || null, live: !!item.live, channel: item.channel || null, url: item.kind === 'local' ? null : item.url || null,
+  season: item.season || null, episode: item.episode || null, igType: item.igType || null, code: item.code || null,
+});
+// Anything actually played goes into Watched right away, whatever it is; ratings join it later.
+function markWatched(room, item) {
+  item.watched = true;
+  if (room.history.some((h) => h.id === item.id)) return;
+  room.history.unshift({ ...snapshot(item), at: Date.now(), votes: [] });
+  room.history = room.history.slice(0, 50);
+}
+
+function startRating(room, item) {
+  if (!item?.watched) return;
+  clearTimeout(room.ratingTimer);
+  room.rating = { itemId: item.id, votes: {}, revealed: false, item: snapshot(item) };
+  room.ratingTimer = setTimeout(() => revealRating(room), RATING_TIMEOUT_MS);
+}
+function revealRating(room) {
+  const r = room.rating;
+  if (!r || r.revealed) return;
+  clearTimeout(room.ratingTimer);
+  r.revealed = true;
+  const scores = Object.values(r.votes).filter((v) => v.score);
+  const entry = room.history.find((h) => h.id === r.itemId);
+  if (entry) entry.votes = scores;
+  else room.history.unshift({ ...r.item, at: Date.now(), votes: scores });
+  room.history = room.history.slice(0, 50);
+  broadcast(room);
+}
+function maybeReveal(room) {
+  const r = room.rating;
+  if (!r || r.revealed) return;
+  const viewers = [...room.members.values()].filter((m) => !m.remote);
+  if (viewers.length && viewers.every((m) => r.votes[m.id])) revealRating(room);
+}
+
 function advance(room, by) {
+  startRating(room, room.current);
   const next = room.queue.shift() || null;
   setCurrent(room, next);
-  // YouTube rolls straight on after a short countdown. Instagram and streaming
+  // Videos in the box roll straight on after a short countdown. Instagram and streaming
   // services wait for someone to tap Start together, since each person has to open them.
-  if (next?.kind === 'youtube') startCountdown(room, 5, by);
+  if (IN_BOX.includes(next?.kind)) startCountdown(room, 5, by);
 }
 
 function updateHolds(room) {
@@ -249,13 +468,253 @@ function updateHolds(room) {
   }
 }
 
+const cleanTitle = (t) => str(t, 60).replace(/\s+/g, ' ') || null;
+
 function adoptCache(room, cache) {
+  room.title = cleanTitle(cache.title);
+  room.visibility = cache.visibility === 'public' ? 'public' : 'private';
   const items = Array.isArray(cache.queue) ? cache.queue.slice(0, 100).map(cleanItem).filter(Boolean) : [];
   const shows = Array.isArray(cache.shows) ? cache.shows.slice(0, 50).map(cleanShow).filter(Boolean) : [];
   room.queue = items;
   room.shows = shows;
+  room.chat = Array.isArray(cache.chat) ? cache.chat.slice(-100).map(cleanChat).filter(Boolean) : [];
+  room.history = Array.isArray(cache.history) ? cache.history.slice(0, 50).map(cleanHistory).filter(Boolean) : [];
+  room.played = Array.isArray(cache.played) ? cache.played.slice(0, PLAYED_MAX).map(cleanItem).filter(Boolean) : [];
+  const reels = Array.isArray(cache.reels) ? cache.reels.slice(0, REELS_MAX) : [];
+  room.reels.items = reels.map((r) => reelItem(parseMedia(r?.url), { name: str(r?.addedBy, 24) || 'Someone', color: MEMBER_COLORS.includes(r?.color) ? r.color : null })).filter(Boolean);
   const cur = cleanItem(cache.current);
   if (cur) setCurrent(room, cur);
+}
+
+function cleanChat(m) {
+  if (!m || typeof m !== 'object' || !str(m.text, 500)) return null;
+  return {
+    id: str(m.id, 20) || newId(), from: str(m.from, 40) || null, name: str(m.name, 24) || 'Someone',
+    color: MEMBER_COLORS.includes(m.color) ? m.color : null, text: str(m.text, 500),
+    at: num(m.at, 0, 1e15, Date.now()), pos: m.pos == null ? null : num(m.pos, 0, 1e6, 0), itemId: str(m.itemId, 20) || null,
+  };
+}
+function cleanHistory(h) {
+  if (!h || typeof h !== 'object' || !str(h.title, 140)) return null;
+  const votes = Array.isArray(h.votes) ? h.votes.slice(0, 8).map((v) => ({
+    id: str(v?.id, 40), name: str(v?.name, 24), color: MEMBER_COLORS.includes(v?.color) ? v.color : null, score: num(v?.score, 1, 5, 3),
+  })) : [];
+  return {
+    id: str(h.id, 20), title: str(h.title, 140), kind: str(h.kind, 20), service: str(h.service, 20) || null,
+    videoId: /^[\w-]{6,20}$/.test(h.videoId) ? h.videoId : null, thumb: /^https:\/\/i\.vimeocdn\.com\//.test(h.thumb) ? h.thumb : null,
+    live: !!h.live, channel: str(h.channel, 25) || null, at: num(h.at, 0, 1e15, Date.now()), votes,
+    poster: POSTER.test(str(h.poster, 300)) ? str(h.poster, 300) : null,
+    url: h.url && parseMedia(h.url)?.url ? parseMedia(h.url).url : null,
+    season: h.season ? num(h.season, 0, 99, null) : null, episode: h.episode ? num(h.episode, 0, 999, null) : null,
+    igType: h.igType === 'p' ? 'p' : h.igType === 'reel' ? 'reel' : null, code: /^[\w-]{5,40}$/.test(h.code || '') ? h.code : null,
+  };
+}
+
+// Puts a pasted link (or a show name) into a room. Used by the add form, the extension's
+// "Add to Couchline", and the phone share sheet.
+// TikTok's share button gives short links (vm.tiktok.com/...). They redirect to the video.
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
+async function resolveShort(media) {
+  if (media?.kind !== 'tiktok' || !media.short) return media;
+  try {
+    const r = await fetch(media.url, { redirect: 'follow', headers: { 'User-Agent': BROWSER_UA }, signal: AbortSignal.timeout(6000) });
+    r.body?.cancel().catch(() => {});
+    const found = parseMedia(r.url);
+    if (found?.kind === 'tiktok' && found.videoId) return found;
+  } catch { /* falls through to the message below */ }
+  return { error: 'That TikTok link didn’t open a video. Copy the link again from TikTok.' };
+}
+
+async function addToRoom(room, { input, service, title, asName, playNow, poster, season, episode }, by) {
+  let media = asName ? (str(input, 120) ? { kind: 'stream', title: str(input, 120) } : null) : parseMedia(input);
+  media = await resolveShort(media);
+  if (media?.error) return { error: media.error };
+  // While swiping together is on, reels and TikToks join the deck instead of Up next.
+  if ((media?.kind === 'instagram' || media?.kind === 'tiktok') && room.reels.on) {
+    const added = addReel(room, media, by);
+    if (!added) return { error: 'That one is already in the deck.' };
+    broadcast(room);
+    toast(room, `${by.name} added ${media.kind === 'tiktok' ? 'a TikTok' : 'a reel'}`, by);
+    return { ok: true, item: { title: media.kind === 'tiktok' ? 'TikTok' : 'Instagram reel' }, warnings: [] };
+  }
+  if (!media) return { error: 'That link isn’t supported. Paste a YouTube, Vimeo, Twitch, Instagram, Netflix, Hulu, Jellyfin, Plex, or video file link, or type a show name.' };
+  if (room.queue.length >= 100) return { error: 'Up next is full. Remove something first.' };
+  const item = cleanItem({ ...media, service: media.service || service, title: media.title || str(title, 140), addedBy: by.name, poster, season, episode });
+  if (!item) return { error: 'That link isn’t supported.' };
+  const putOn = !room.current || !!playNow;
+  if (putOn) {
+    if (room.current && playNow) advanceTo(room, item, by);
+    else setCurrent(room, item);
+  } else {
+    room.queue.push(item);
+  }
+  broadcast(room);
+  toast(room, putOn ? `${by.name} put on ${item.title}` : `${by.name} added ${item.title}`, by);
+  if (OEMBED[item.kind]) {
+    oembed(item).then((r) => {
+      if (!r) return;
+      if (r.title) item.title = r.title;
+      if (r.thumb) item.thumb = r.thumb;
+      broadcast(room);
+    });
+  }
+  return { ok: true, item, warnings: mediaWarnings(item) };
+}
+// ---------- reels together ----------
+const REELS_MAX = 200;
+// The deck holds Instagram reels and posts, and TikToks.
+function reelItem(media, by) {
+  if (media?.kind === 'instagram') return { id: newId(), kind: 'instagram', code: media.code, igType: media.igType, url: media.url, addedBy: by.name, color: by.color || null };
+  if (media?.kind === 'tiktok' && media.videoId) return { id: newId(), kind: 'tiktok', videoId: media.videoId, url: media.url, addedBy: by.name, color: by.color || null };
+  return null;
+}
+const swipeable = (it) => it?.kind === 'instagram' || it?.kind === 'tiktok';
+function addReel(room, media, by) {
+  const key = media.code || media.videoId;
+  if (room.reels.items.some((r) => (r.code || r.videoId) === key)) return false;
+  room.reels.items.push(reelItem(media, by));
+  if (room.reels.items.length > REELS_MAX) room.reels.items.shift();
+  return true;
+}
+
+// "Play now": the current item gets rated if it was watched, and the new one starts on a countdown.
+function advanceTo(room, item, by) {
+  startRating(room, room.current);
+  setCurrent(room, item);
+  if (IN_BOX.includes(item.kind)) startCountdown(room, 3, by);
+}
+
+// Someone shared their Instagram scrolling (from the extension): show that post to the room.
+function followTo(room, url, by) {
+  const media = parseMedia(url);
+  if (media?.kind !== 'instagram' && !(media?.kind === 'tiktok' && media.videoId)) return { error: 'Only Instagram and TikTok posts can be followed.' };
+  const starting = !room.follow;
+  if (starting && synced(room) && room.playback.playing) setPlayback(room, false, posNow(room));
+  room.follow = {
+    name: by.name, color: by.color || null, kind: media.kind, url: media.url,
+    igType: media.igType || null, code: media.code || media.videoId, videoId: media.videoId || null, at: Date.now(),
+  };
+  // If the sharer closes Instagram without stopping, sharing ends after a while on its own.
+  clearTimeout(room.followTimer);
+  room.followTimer = setTimeout(() => { room.follow = null; broadcast(room); }, 30 * 60 * 1000);
+  broadcast(room);
+  if (starting) toast(room, `${by.name} is sharing their ${media.kind === 'tiktok' ? 'TikTok' : 'Instagram'} scrolling`, by);
+  return { ok: true };
+}
+
+// ---------- HTTP API (extension and share sheet) ----------
+// The room code is the only key, the same as joining by link, so these accept any origin.
+const httpBuckets = new Map();
+function httpLimited(req) {
+  const key = req.ip || 'x';
+  const now = Date.now();
+  const b = httpBuckets.get(key) || { count: 0, since: now };
+  if (now - b.since > 10000) { b.count = 0; b.since = now; }
+  b.count++;
+  httpBuckets.set(key, b);
+  if (httpBuckets.size > 5000) httpBuckets.clear();
+  return b.count > 40;
+}
+app.use('/api', (req, res, next) => {
+  res.set({ 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Content-Type' });
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  if (httpLimited(req)) return res.status(429).json({ error: 'Too many requests. Wait a moment.' });
+  next();
+});
+app.use('/api', express.json({ limit: '10kb' }));
+const apiRoom = (req, res) => {
+  const roomId = str(req.body?.room, 40).toLowerCase();
+  const room = rooms.get(roomId);
+  if (!room || !room.members.size) {
+    res.status(404).json({ error: 'Nobody is in that room right now. Open Couchline and join it first.' });
+    return null;
+  }
+  return room;
+};
+const apiBy = (room, req) => {
+  const name = str(req.body?.name, 24) || 'Someone';
+  const member = [...room.members.values()].find((m) => m.name.toLowerCase() === name.toLowerCase());
+  return { name, color: member?.color || null };
+};
+app.post('/api/drop', async (req, res) => {
+  const room = apiRoom(req, res);
+  if (!room) return;
+  const r = await addToRoom(room, { input: req.body.input, playNow: !!req.body.play }, apiBy(room, req));
+  res.status(r.error ? 400 : 200).json(r.error ? { error: r.error } : { ok: true, title: r.item.title, warnings: r.warnings });
+});
+app.post('/api/follow', (req, res) => {
+  const room = apiRoom(req, res);
+  if (!room) return;
+  const r = followTo(room, req.body.url, apiBy(room, req));
+  res.status(r.error ? 400 : 200).json(r);
+});
+app.post('/api/follow/stop', (req, res) => {
+  const room = apiRoom(req, res);
+  if (!room) return;
+  if (room.follow) {
+    room.follow = null;
+    broadcast(room);
+  }
+  res.json({ ok: true });
+});
+// YouTube search, when a key is set. Results are cached briefly to save quota.
+const searchCache = new Map();
+// The public room directory: public rooms with people in them, busiest first. Searches the
+// room's title, what's on, and its code.
+app.get('/api/rooms', (req, res) => {
+  const q = str(req.query.q, 60).toLowerCase();
+  const list = [...rooms.values()]
+    .filter((r) => r.visibility === 'public' && r.members.size)
+    .filter((r) => !q || [r.title, r.current?.title, r.id].some((s) => s && s.toLowerCase().includes(q)))
+    .sort((a, b) => b.members.size - a.members.size || (b.lastActive || 0) - (a.lastActive || 0))
+    .slice(0, 50)
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      people: [...r.members.values()].filter((m) => !m.remote).map((m) => ({ name: m.name, color: m.color })),
+      playing: r.playback.playing && Date.now() >= r.playback.at,
+      now: r.current ? {
+        title: r.current.title, kind: r.current.kind, service: r.current.service || null, videoId: r.current.videoId || null,
+        thumb: r.current.thumb || null, poster: r.current.poster || null, live: !!r.current.live, channel: r.current.channel || null,
+      } : null,
+    }));
+  res.json({ rooms: list });
+});
+
+app.get('/api/search/youtube', async (req, res) => {
+  if (!YOUTUBE_API_KEY) return res.status(501).json({ error: 'YouTube search isn’t set up on this server.' });
+  const q = str(req.query.q, 100);
+  if (!q) return res.json({ results: [] });
+  const hit = searchCache.get(q.toLowerCase());
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return res.json({ results: hit.results });
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&safeSearch=moderate&q=${encodeURIComponent(q)}&key=${YOUTUBE_API_KEY}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return res.status(502).json({ error: 'YouTube search didn’t answer. Try again in a moment.' });
+    const j = await r.json();
+    const results = (j.items || []).filter((it) => it.id?.videoId).map((it) => ({
+      videoId: it.id.videoId, title: str(it.snippet?.title, 140), channel: str(it.snippet?.channelTitle, 80), live: it.snippet?.liveBroadcastContent === 'live',
+    }));
+    searchCache.set(q.toLowerCase(), { at: Date.now(), results });
+    if (searchCache.size > 300) searchCache.clear();
+    res.json({ results });
+  } catch {
+    res.status(502).json({ error: 'YouTube search didn’t answer. Try again in a moment.' });
+  }
+});
+
+// Each address can try this many different rooms in 10 minutes. Plenty for real use; far too
+// few to go looking for private rooms by guessing codes.
+const ROOM_TRIES = 30;
+const roomTries = new Map(); // address -> { since, rooms: Set }
+function tooManyRooms(socket, roomId) {
+  const addr = String(socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || '').split(',')[0].trim();
+  const now = Date.now();
+  let t = roomTries.get(addr);
+  if (!t || now - t.since > 10 * 60 * 1000) { t = { since: now, rooms: new Set() }; roomTries.set(addr, t); }
+  if (roomTries.size > 10000) roomTries.clear();
+  t.rooms.add(roomId);
+  return t.rooms.size > ROOM_TRIES;
 }
 
 // ---------- sockets ----------
@@ -264,20 +723,28 @@ io.on('connection', (socket) => {
   let me = null;
   let bucket = { count: 0, since: Date.now() };
 
-  const limited = () => {
+  // Call and file-sharing setup messages come in bursts (several per person in the call),
+  // so they get their own, larger allowance; everything else shares the smaller one.
+  let signalBucket = { count: 0, since: Date.now() };
+  const limited = (event) => {
     const now = Date.now();
+    if (event === 'signal') {
+      if (now - signalBucket.since > 1000) signalBucket = { count: 0, since: now };
+      return ++signalBucket.count > 400;
+    }
     if (now - bucket.since > 1000) bucket = { count: 0, since: now };
     return ++bucket.count > 40;
   };
   const on = (event, fn) => socket.on(event, (data, cb) => {
-    if (!room || !me || limited()) return;
+    if (!room || !me || limited(event)) return;
     try {
       fn(data || {}, typeof cb === 'function' ? cb : () => {});
     } catch (err) {
       console.error(event, err);
     }
   });
-  const isYouTube = () => room.current?.kind === 'youtube';
+  const isSynced = () => synced(room);
+  const canSeek = () => isSynced() && !room.current.live; // live streams have no timeline to share
 
   socket.on('time:ping', (cb) => typeof cb === 'function' && cb(Date.now()));
 
@@ -285,25 +752,61 @@ io.on('connection', (socket) => {
     if (room || typeof data !== 'object') return;
     const roomId = str(data.roomId, 40).toLowerCase();
     if (!/^[a-z0-9-]{3,40}$/.test(roomId)) return typeof cb === 'function' && cb({ error: 'That room code is not valid.' });
+    // Private rooms are found only by their code, so trying lots of codes is cut off.
+    if (tooManyRooms(socket, roomId)) return typeof cb === 'function' && cb({ error: 'Too many different rooms tried. Wait a few minutes and try again.' });
     room = getRoom(roomId);
+    const brandNew = room.fresh;
     if (room.fresh && data.cache && typeof data.cache === 'object') adoptCache(room, data.cache);
     room.fresh = false;
     const clientId = str(data.clientId, 40) || newId();
     const previous = room.members.get(clientId);
+    // The first person into a new room (or back into one after a restart) is its host.
+    if (brandNew || !room.host) room.host = clientId;
+    room.lastActive = Date.now();
     me = {
       id: clientId, socketId: socket.id, name: str(data.name, 24) || 'Guest',
       color: previous?.color || pickColor(room), remote: !!data.remote, inCall: false, drift: null,
+      // Set when this seat is the Couchline extension running on a Netflix or Hulu page.
+      ext: EXT_SERVICES.includes(data.ext) ? data.ext : null,
+      files: [], // fingerprints of local video files this seat can play (and share)
+      joinedAt: previous?.joinedAt || Date.now(),
     };
     room.members.set(clientId, me);
     socket.join(roomId);
-    if (typeof cb === 'function') cb({ ok: true, clientId, iceServers: iceServers() });
+    if (typeof cb === 'function') cb({ ok: true, clientId, iceServers: iceServers(), twitchParent: TWITCH_PARENT, youtubeSearch: !!YOUTUBE_API_KEY, chat: room.chat.slice(-100) });
     broadcast(room);
     if (!previous) toast(room, `${me.name} joined`, me);
   });
 
-  // ----- playback (YouTube) -----
+  // The room's title and private or public. Only the host (or whoever stands in) can change them.
+  on('room:settings', (d, cb) => {
+    if (hostOf(room) !== me.id) return cb({ error: `Only ${room.members.get(hostOf(room))?.name || 'the host'} can change this.` });
+    const changes = [];
+    if ('title' in d) {
+      const title = cleanTitle(d.title);
+      if (title !== room.title) {
+        room.title = title;
+        changes.push(title ? `named the room ${title}` : 'cleared the room name');
+      }
+    }
+    if ('visibility' in d && ['private', 'public'].includes(d.visibility) && d.visibility !== room.visibility) {
+      room.visibility = d.visibility;
+      changes.push(d.visibility === 'public' ? 'made the room public' : 'made the room private');
+    }
+    broadcast(room);
+    if (changes.length) toast(room, `${me.name} ${changes.join(' and ')}`, me);
+    cb({ ok: true });
+  });
+
+  // A web seat can turn itself into a remote, so it stops counting as a viewer.
+  on('member:remote', (d) => {
+    me.remote = !!d.on;
+    broadcast(room);
+  });
+
+  // ----- playback (everything in the video box, plus Netflix and Hulu through the extension) -----
   on('cmd:play', (d) => {
-    if (!isYouTube()) return;
+    if (!isSynced()) return;
     clearCountdown(room);
     clearHolds(room);
     setPlayback(room, true, num(d.position, 0, 1e6, posNow(room)));
@@ -311,7 +814,7 @@ io.on('connection', (socket) => {
     toast(room, `${me.name} pressed play`, me);
   });
   on('cmd:pause', (d) => {
-    if (!isYouTube()) return;
+    if (!isSynced()) return;
     clearCountdown(room);
     clearHolds(room);
     setPlayback(room, false, num(d.position, 0, 1e6, posNow(room)));
@@ -319,7 +822,7 @@ io.on('connection', (socket) => {
     toast(room, `${me.name} paused at ${fmt(room.playback.position)}`, me);
   });
   on('cmd:seek', (d) => {
-    if (!isYouTube()) return;
+    if (!canSeek()) return;
     const p = num(d.position, 0, 1e6, posNow(room));
     const playing = room.playback.playing || room.heldPause;
     clearCountdown(room);
@@ -336,11 +839,40 @@ io.on('connection', (socket) => {
   });
   on('media:ended', (d) => {
     if (!room.current || room.current.id !== d.itemId) return; // someone else already advanced
+    finishEpisode(room, room.current, me);
     advance(room, me);
     broadcast(room);
   });
+  // Netflix or Hulu moved on to another title by itself (the next episode, usually).
+  // Every extension tab reports it; the first report wins, like media:ended.
+  on('ext:next', (d) => {
+    const cur = room.current;
+    if (!cur || cur.id !== d.itemId || !extSynced(room)) return;
+    const next = parseMedia(d.url);
+    if (next?.kind !== 'stream' || next.service !== cur.service || watchId(next.url) === watchId(cur.url)) return;
+    finishEpisode(room, cur, me);
+    // Autoplay rolls on mid-playback. Picking another title while paused leaves everyone paused.
+    const wasPlaying = room.playback.playing || room.heldPause;
+    const queued = room.queue[0];
+    if (queued) {
+      advance(room, me);
+      // The queue held this very episode, so carry on playing instead of pausing everyone.
+      if (queued.kind === 'stream' && queued.service === cur.service && watchId(queued.url) === watchId(next.url)) keepPlaying(room, wasPlaying);
+      toast(room, `${cur.service} moved on, so the room moved to ${queued.title}`);
+    } else {
+      // Nothing queued: follow the new episode so the binge stays in sync.
+      startRating(room, cur);
+      setCurrent(room, cleanItem({
+        kind: 'stream', service: cur.service, url: next.url, title: cur.title, season: cur.season,
+        episode: cur.episode ? cur.episode + 1 : null, showId: cur.showId, addedBy: cur.addedBy,
+      }));
+      keepPlaying(room, wasPlaying);
+      toast(room, `${cur.service} moved on to the next episode. Still in sync.`);
+    }
+    broadcast(room);
+  });
   on('buffering', (d) => {
-    if (!isYouTube()) return;
+    if (!isSynced()) return;
     clearTimeout(room.holds.get(me.id));
     if (d.on) {
       room.holds.set(me.id, setTimeout(() => {
@@ -359,44 +891,71 @@ io.on('connection', (socket) => {
     room.driftTimer ||= setTimeout(() => { room.driftTimer = null; broadcast(room); }, 2000);
   });
 
-  // ----- countdown (Instagram, Netflix, Hulu, and YouTube "play now") -----
+  // ----- countdown (Instagram, Netflix, Hulu, and "play now" for the video box) -----
   on('countdown:start', (d) => {
     if (!room.current) return;
-    startCountdown(room, num(d.seconds, 3, 10, 5), me);
+    startCountdown(room, num(d.seconds, 3, 10, 5), me, d.position != null ? num(d.position, 0, 1e6, 0) : null);
     broadcast(room);
   });
   on('countdown:cancel', () => {
     if (!room.countdown) return;
     clearCountdown(room);
-    if (isYouTube()) setPlayback(room, false, room.playback.position);
+    if (isSynced()) setPlayback(room, false, room.playback.position);
     broadcast(room);
     toast(room, `${me.name} cancelled the countdown`, me);
   });
 
   // ----- queue -----
+  // "asName" comes from the Type a show box, so "S.W.A.T." isn't mistaken for a web address.
   on('queue:add', (d, cb) => {
-    const media = parseMedia(d.input);
-    if (!media) return cb({ error: 'That link isn’t supported. Paste a YouTube or Instagram link, or type a show name.' });
+    addToRoom(room, { input: d.input, service: d.service, title: d.title, asName: d.asName, playNow: d.playNow, poster: d.poster, season: d.season, episode: d.episode }, me)
+      .then((r) => cb(r.error ? { error: r.error } : { ok: true, warnings: r.warnings }))
+      .catch((err) => { console.error('queue:add', err); cb({ error: 'That couldn’t be added.' }); });
+  });
+  // A video file on the adder's device. Others pick their own copy or get it from someone who has it.
+  on('queue:addLocal', (d, cb) => {
     if (room.queue.length >= 100) return cb({ error: 'Up next is full. Remove something first.' });
-    const item = cleanItem({
-      ...media,
-      service: media.service || d.service,
-      title: media.kind === 'stream' && !media.url ? media.title : str(d.title, 140),
-      addedBy: me.name,
-    });
-    if (!item) return cb({ error: 'That link isn’t supported.' });
+    const item = cleanItem({ kind: 'local', name: d.name, size: d.size, fp: d.fp, mime: d.mime, duration: d.duration, title: str(d.name, 140).replace(/\.[\w]{2,5}$/, ''), addedBy: me.name });
+    if (!item) return cb({ error: 'That file couldn’t be added.' });
+    if (!me.files.includes(item.fp)) me.files = [...me.files, item.fp].slice(-20);
     const putOn = !room.current;
     if (putOn) setCurrent(room, item);
     else room.queue.push(item);
     broadcast(room);
     cb({ ok: true });
     toast(room, putOn ? `${me.name} put on ${item.title}` : `${me.name} added ${item.title}`, me);
-    if (item.kind === 'youtube') {
-      youtubeTitle(item.videoId).then((t) => { if (t) { item.title = t; broadcast(room); } });
-    }
+  });
+  on('local:have', (d) => {
+    me.files = (Array.isArray(d.fps) ? d.fps : []).filter((f) => FINGERPRINT.test(f)).slice(-20);
+    broadcast(room);
   });
   on('queue:remove', (d) => {
     room.queue = room.queue.filter((it) => it.id !== d.id);
+    broadcast(room);
+  });
+  // Played items: put one back on now, add it back to Up next, or tidy the list.
+  on('played:again', (d) => {
+    const old = room.played.find((p) => p.id === d.id);
+    if (!old) return;
+    const item = cleanItem({ ...old, id: null, addedBy: me.name });
+    if (!item) return;
+    if (d.now) {
+      advanceTo(room, item, me);
+      toast(room, `${me.name} put ${item.title} back on`, me);
+    } else {
+      if (room.queue.length >= 100) return;
+      if (room.current) room.queue.push(item);
+      else setCurrent(room, item);
+      toast(room, `${me.name} added ${item.title} back`, me);
+    }
+    broadcast(room);
+  });
+  on('played:remove', (d) => {
+    room.played = room.played.filter((p) => p.id !== d.id);
+    broadcast(room);
+  });
+  on('played:clear', () => {
+    room.played = [];
     broadcast(room);
   });
   on('queue:move', (d) => {
@@ -410,8 +969,9 @@ io.on('connection', (socket) => {
     const i = room.queue.findIndex((it) => it.id === d.id);
     if (i < 0) return;
     const [item] = room.queue.splice(i, 1);
+    startRating(room, room.current);
     setCurrent(room, item);
-    if (item.kind === 'youtube') startCountdown(room, 3, me);
+    if (IN_BOX.includes(item.kind)) startCountdown(room, 3, me);
     broadcast(room);
     toast(room, `${me.name} put on ${item.title}`, me);
   });
@@ -454,9 +1014,10 @@ io.on('connection', (socket) => {
   on('show:watch', (d) => {
     const show = room.shows.find((s) => s.id === d.id);
     if (!show) return;
+    startRating(room, room.current);
     setCurrent(room, cleanItem({
       kind: 'stream', service: show.service, title: show.title,
-      season: show.season, episode: show.episode, showId: show.id, addedBy: me.name,
+      season: show.season, episode: show.episode, showId: show.id, addedBy: me.name, poster: show.poster,
     }));
     broadcast(room);
     toast(room, `${me.name} put on ${show.title} S${show.season} E${show.episode}`, me);
@@ -468,10 +1029,166 @@ io.on('connection', (socket) => {
     const now = Date.now();
     if (now - (me.lastReact || 0) < 300) return;
     me.lastReact = now;
-    io.to(room.id).emit('react', { emoji: d.emoji, color: me.color });
+    // Jinx: two people sending the same reaction within two seconds get a big burst.
+    const jinx = !!room.lastReact && room.lastReact.emoji === d.emoji && room.lastReact.by !== me.id && now - room.lastReact.at < 2000;
+    room.lastReact = { emoji: d.emoji, by: me.id, at: now };
+    io.to(room.id).emit('react', { emoji: d.emoji, color: me.color, jinx });
+  });
+
+  on('chat:send', (d, cb) => {
+    const text = str(d.text, 500);
+    if (!text) return cb({ error: 'empty' });
+    const now = Date.now();
+    if (now - (me.lastChat || 0) < 250) return cb({ error: 'Slow down a little.' });
+    me.lastChat = now;
+    const msg = {
+      id: newId(), from: me.id, name: me.name, color: me.color, text, at: now,
+      // Messages remember where in the video they were sent, so they can jump back there.
+      pos: room.current && synced(room) && !room.current.live ? Math.round(posNow(room) * 10) / 10 : null,
+      itemId: room.current?.id || null,
+    };
+    room.chat.push(msg);
+    if (room.chat.length > CHAT_MAX) room.chat.splice(0, room.chat.length - CHAT_MAX);
+    io.to(room.id).emit('chat', msg);
+    socket.to(room.id).emit('typing', { id: me.id, name: me.name, on: false });
+    cb({ ok: true });
+  });
+  on('chat:typing', (d) => {
+    socket.to(room.id).emit('typing', { id: me.id, name: me.name, color: me.color, on: !!d.on });
+  });
+
+  // Press and hold on the video: a ping at that spot on everyone's screen.
+  on('ping', (d) => {
+    const now = Date.now();
+    if (now - (me.lastPing || 0) < 250) return;
+    me.lastPing = now;
+    io.to(room.id).emit('ping', { x: num(d.x, 0, 1, 0.5), y: num(d.y, 0, 1, 0.5), color: me.color, name: me.name });
+  });
+
+  // Moments: a starred spot in the current video, shown on everyone's timeline.
+  on('moment:add', (d) => {
+    if (!room.current || !synced(room) || room.current.live) return;
+    const pos = num(d.pos, 0, 1e6, posNow(room));
+    room.moments.push({ id: newId(), itemId: room.current.id, pos, note: str(d.note, 80) || null, name: me.name, color: me.color });
+    if (room.moments.length > 100) room.moments.shift();
+    broadcast(room);
+    toast(room, `${me.name} starred ${fmt(pos)}`, me);
+  });
+  on('moment:remove', (d) => {
+    room.moments = room.moments.filter((m) => m.id !== d.id);
+    broadcast(room);
+  });
+
+  // Ready check: when everyone watching has tapped Ready, the countdown starts by itself.
+  on('ready:toggle', () => {
+    if (!room.current || (room.playback.playing && Date.now() >= room.playback.at) || room.countdown) return;
+    if (room.ready?.itemId !== room.current.id) room.ready = { itemId: room.current.id, ids: [] };
+    const ids = room.ready.ids;
+    room.ready.ids = ids.includes(me.id) ? ids.filter((x) => x !== me.id) : [...ids, me.id];
+    const viewers = [...room.members.values()].filter((m) => !m.remote);
+    if (viewers.length > 1 && viewers.every((m) => room.ready.ids.includes(m.id))) {
+      room.ready = null;
+      startCountdown(room, 3, me);
+      toast(room, 'Everyone’s ready');
+    }
+    broadcast(room);
+  });
+
+  // Rate it together.
+  on('rate', (d) => {
+    const r = room.rating;
+    if (!r || r.revealed || r.itemId !== d.itemId) return;
+    r.votes[me.id] = { id: me.id, name: me.name, color: me.color, score: d.score == null ? 0 : num(d.score, 1, 5, 3) };
+    maybeReveal(room);
+    broadcast(room);
+  });
+  on('rate:dismiss', () => {
+    if (room.rating?.revealed) { room.rating = null; broadcast(room); }
+  });
+
+  // Stepped away: the tab is hidden. Optionally pauses everyone after a few seconds.
+  on('presence', (d) => {
+    me.away = !!d.away;
+    clearTimeout(me.awayTimer);
+    if (me.away && room.settings.pauseOnAway) {
+      me.awayTimer = setTimeout(() => {
+        if (!room || !me.away || !isWatching(room, me) || !room.playback.playing || Date.now() < room.playback.at) return;
+        setPlayback(room, false, posNow(room));
+        toast(room, `${me.name} stepped away. Paused at ${fmt(room.playback.position)}.`, me);
+        broadcast(room);
+      }, AWAY_PAUSE_MS);
+    }
+    broadcast(room);
+  });
+  on('settings:set', (d) => {
+    if ('pauseOnAway' in d) room.settings.pauseOnAway = !!d.pauseOnAway;
+    broadcast(room);
+    toast(room, `${me.name} turned ${room.settings.pauseOnAway ? 'on' : 'off'} pausing when someone steps away`, me);
+  });
+
+  // Instagram follow, from a member's own connection (the HTTP API covers the extension).
+  on('follow:goto', (d, cb) => cb(followTo(room, d.url, me)));
+  // Reels together. Reels waiting in Up next move into the deck; whoever swipes is driving,
+  // and everyone's screen shows the same reel.
+  on('reels:start', () => {
+    const r = room.reels;
+    const moving = room.queue.filter(swipeable);
+    room.queue = room.queue.filter((it) => !swipeable(it));
+    for (const it of moving) addReel(room, it, { name: it.addedBy || me.name, color: null });
+    if (swipeable(room.current)) addReel(room, room.current, { name: room.current.addedBy || me.name, color: null });
+    if (!r.on) {
+      r.on = true;
+      r.driver = me.id;
+      if (synced(room) && room.playback.playing) setPlayback(room, false, posNow(room));
+      toast(room, `${me.name} started swiping together`, me);
+    }
+    r.index = Math.min(r.index, Math.max(0, r.items.length - 1));
+    broadcast(room);
+  });
+  on('reels:go', (d) => {
+    const r = room.reels;
+    if (!r.on || !r.items.length) return;
+    r.index = Math.round(num(d.index, 0, r.items.length - 1, r.index));
+    r.driver = me.id;
+    broadcast(room);
+  });
+  on('reels:remove', (d) => {
+    const r = room.reels;
+    const i = r.items.findIndex((x) => x.id === d.id);
+    if (i < 0) return;
+    r.items.splice(i, 1);
+    if (r.index > i || r.index >= r.items.length) r.index = Math.max(0, r.index - 1);
+    broadcast(room);
+  });
+  on('reels:clear', () => {
+    room.reels.items = [];
+    room.reels.index = 0;
+    broadcast(room);
+  });
+  on('reels:stop', () => {
+    if (!room.reels.on) return;
+    room.reels.on = false;
+    broadcast(room);
+    toast(room, `${me.name} ended swiping together`, me);
+  });
+
+  on('follow:stop', () => {
+    if (!room.follow) return;
+    room.follow = null;
+    broadcast(room);
   });
   on('call:state', (d) => {
+    const joining = !!d.inCall && !me.inCall;
     me.inCall = !!d.inCall;
+    me.cam = me.inCall && d.cam !== false; // has (or wants) a camera
+    me.live = me.inCall && !!d.live; // the camera is actually on
+    if (joining) {
+      // A quick reconnect (a network blip) keeps its place in line for a camera spot.
+      const kept = room.callPlaces?.get(me.id);
+      me.callSince = kept && Date.now() - kept.left < 2 * 60 * 1000 ? kept.since : Date.now();
+      room.callPlaces?.delete(me.id);
+    }
+    if (!me.inCall) me.callSince = null;
     broadcast(room);
   });
   // WebRTC signaling relay, keyed by client id (pattern from WatchParty's sendSignal).
@@ -483,12 +1200,16 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     if (!room || !me || room.members.get(me.id)?.socketId !== socket.id) return;
+    const wasWatching = isWatching(room, me);
+    clearTimeout(me.awayTimer);
+    if (me.inCall && me.callSince) (room.callPlaces ||= new Map()).set(me.id, { since: me.callSince, left: Date.now() });
     room.members.delete(me.id);
+    maybeReveal(room);
     clearTimeout(room.holds.get(me.id));
     room.holds.delete(me.id);
     if (room.members.size) {
       // A remote-only phone leaving shouldn't stop the show on the TV.
-      if (!me.remote && isYouTube() && room.playback.playing && Date.now() >= room.playback.at) {
+      if (wasWatching && room.playback.playing && Date.now() >= room.playback.at) {
         setPlayback(room, false, posNow(room));
         room.heldPause = false;
         toast(room, `${me.name} dropped off. Paused at ${fmt(room.playback.position)}.`, me);

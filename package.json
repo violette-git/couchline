@@ -3,15 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Watch YouTube, Instagram, Netflix, and Hulu together from two places.",
+  "description": "Watch YouTube, Vimeo, Twitch, your own videos, Instagram, Netflix, and Hulu together from two places.",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node test/smoke.js"
+    "build:ext": "node scripts/build-extension.js",
+    "test": "node scripts/build-extension.js --check && node test/media.js && node test/rules.js && node test/smoke.js && node test/sources.js && node test/extension.js && node test/social.js && node test/rooms.js"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "express": "^4.21.2",
+    "fflate": "^0.8.3",
+    "hls.js": "^1.7.3",
+    "qrcode-generator": "^1.5.2",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {

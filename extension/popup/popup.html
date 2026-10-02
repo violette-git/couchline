@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Couchline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap">
+  <link rel="stylesheet" href="../lib/styles.css">
+  <style>
+    body { width: 320px; padding: 1rem 1rem 1.1rem; display: grid; gap: 0.8rem; }
+    .brand { font-size: 1.5rem; }
+    p { margin: 0; }
+    form { display: grid; gap: 0.7rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    hr { border: 0; border-top: 1px solid var(--line); width: 100%; margin: 0.15rem 0; }
+    /* What's on this page, as a small card. */
+    #pageBox { display: grid; gap: 0.55rem; padding: 0.8rem; border: 1px solid var(--line); border-radius: var(--r-medium); background: radial-gradient(120% 100% at 50% -20%, var(--glow), transparent 65%), var(--night-2); box-shadow: inset 0 1px 0 var(--edge); animation: rise-in 0.35s var(--ease-out) backwards; }
+    #pageLabel { color: var(--paper); font-weight: 700; }
+    #status:empty { display: none; }
+    #toggle { justify-self: start; }
+    #roomForm .btn { justify-self: start; }
+    @media (prefers-reduced-motion: reduce) { #pageBox { animation: none; } }
+  </style>
+</head>
+<body>
+  <span class="brand">Couchline</span>
+
+  <section id="pageBox" hidden>
+    <p id="pageLabel" class="hint"></p>
+    <div class="row">
+      <button id="playPage" class="btn btn-primary btn-small">Play now</button>
+      <button id="addPage" class="btn btn-small">Add to Up next</button>
+    </div>
+  </section>
+  <p id="status" class="hint" role="status"></p>
+  <button id="toggle" class="btn btn-small" hidden>Show the sidebar</button>
+
+  <hr>
+  <form id="roomForm">
+    <p class="hint">Your room, for adding things from any site (right-click a link, or the Couchline button on YouTube, Vimeo, Twitch, and Instagram).</p>
+    <label class="field">Couchline address <input id="server" placeholder="https://couchline.example.com" spellcheck="false" required></label>
+    <label class="field">Room code or link <input id="room" placeholder="cozy-lamp-1234" spellcheck="false" required></label>
+    <label class="field">Your name <input id="name" maxlength="24" required></label>
+    <button class="btn btn-small">Save</button>
+  </form>
+  <script src="popup.js"></script>
+</body>
+</html>
