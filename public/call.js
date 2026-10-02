@@ -95,6 +95,7 @@ export class Call {
       const t = this.tiles.get(m.id);
       if (!t) continue;
       t.label.textContent = m.id === this.selfId ? `${m.name} (you)` : m.name;
+      t.avatar.textContent = m.name.trim().charAt(0).toUpperCase();
       t.el.dataset.color = m.color;
     }
   }
@@ -184,14 +185,18 @@ export class Call {
     video.autoplay = true;
     video.playsInline = true;
     video.setAttribute('playsinline', '');
+    const avatar = document.createElement('span');
+    avatar.className = 'tile-avatar';
+    avatar.setAttribute('aria-hidden', 'true');
     const label = document.createElement('figcaption');
     const m = this.members.find((x) => x.id === id);
     label.textContent = m ? (id === this.selfId ? `${m.name} (you)` : m.name) : '';
+    avatar.textContent = m ? m.name.trim().charAt(0).toUpperCase() : '';
     if (m) el.dataset.color = m.color;
-    el.append(video, label);
+    el.append(avatar, video, label);
     if (id === this.selfId) this.tilesEl.prepend(el);
     else this.tilesEl.append(el);
-    t = { el, video, label };
+    t = { el, video, label, avatar };
     this.tiles.set(id, t);
     return t;
   }

@@ -18,6 +18,18 @@ function el(tag, attrs = {}, ...children) {
   node.append(...children.filter((c) => c != null));
   return node;
 }
+// Icons live as <symbol>s in index.html; this just points a <use> at one.
+function icon(name) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'i');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(NS, 'use');
+  use.setAttribute('href', `#i-${name}`);
+  svg.append(use);
+  return svg;
+}
+const initial = (name) => (name || '?').trim().charAt(0).toUpperCase() || '?';
 
 const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
 const WORDS_A = ['maple', 'velvet', 'quiet', 'amber', 'cozy', 'late', 'lucky', 'sunny', 'hazel', 'cobalt'];
@@ -52,7 +64,9 @@ if (routeMatch) {
   show('landing');
 }
 
-$('#createRoom').addEventListener('click', () => { location.href = `/r/${newRoomCode()}`; });
+for (const btn of document.querySelectorAll('[data-create-room]')) {
+  btn.addEventListener('click', () => { location.href = `/r/${newRoomCode()}`; });
+}
 $('#joinCode').addEventListener('submit', (e) => {
   e.preventDefault();
   const code = $('#code').value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -86,6 +100,7 @@ function enterRoom(opts) {
   store.set('remote', opts.remote);
   me.remote = opts.remote;
   document.body.classList.toggle('is-remote', me.remote);
+  $('#roomCodeText').textContent = roomId;
   show('room');
 
   socket = window.io({ transports: ['websocket', 'polling'] });
@@ -131,11 +146,14 @@ const colorOf = (c) => (c ? `var(--${c})` : 'var(--muted)');
 
 function renderRoster() {
   const ul = $('#roster');
-  ul.replaceChildren(...room.members.map((m) => el('li', { 'data-color': m.color, class: m.id === clientId ? 'is-me' : null, title: m.id === clientId ? 'You' : null },
-    el('span', { class: 'dot' }),
-    el('span', { class: 'who' }, m.name),
-    m.remote ? el('span', { class: 'tag' }, 'remote') : null,
-  )));
+  ul.replaceChildren(...room.members.map((m) => {
+    const mine = m.id === clientId;
+    return el('li', { 'data-color': m.color, class: mine ? 'is-me' : null, title: `${m.name}${mine ? ' (you)' : ''}${m.remote ? ', remote' : ''}` },
+      el('span', { class: 'avatar', 'aria-hidden': 'true' }, initial(m.name)),
+      el('span', { class: 'who' }, m.name),
+      mine ? el('span', { class: 'tag' }, 'you') : m.remote ? el('span', { class: 'tag' }, 'remote') : null,
+    );
+  }));
 }
 
 // ---------- stage ----------
@@ -197,6 +215,11 @@ function renderCountdown() {
   if (!room.countdown) { box.hidden = true; return; }
   box.hidden = false;
   box.style.setProperty('--cd', colorOf(room.countdown.color));
+  $('#countBy').textContent = room.countdown.by ? `${room.countdown.by === self()?.name ? 'You' : room.countdown.by} started the countdown` : '';
+  const cur = room.current;
+  const svc = cur?.service && cur.service !== 'Other' ? cur.service : 'your screen';
+  $('#countHint').textContent = cur?.kind === 'stream' ? `Get ready to press play on ${svc}`
+    : cur?.kind === 'instagram' ? 'Get ready to tap play on the reel' : 'Starting on both screens';
   const num = $('#countNum');
   num.textContent = '';
   const step = () => {
@@ -346,7 +369,8 @@ function updateControls() {
   scrub.max = String(dur || 1);
   if (!scrubbing) scrub.value = String(dur ? Math.min(exp, dur) : 0);
   scrub.style.setProperty('--fill', dur ? `${(Number(scrub.value) / dur) * 100}%` : '0%');
-  $('#time').textContent = `${fmt(scrubbing ? Number(scrub.value) : exp)}${dur ? ` / ${fmt(dur)}` : ''}`;
+  $('#time').textContent = fmt(scrubbing ? Number(scrub.value) : exp);
+  $('#timeDur').textContent = dur ? fmt(dur) : '';
 
   const pill = $('#syncPill');
   let text = 'In sync';
@@ -409,10 +433,19 @@ function kindLabel(it) {
 
 function thumbFor(it) {
   const box = el('div', { class: `thumb thumb-${it.kind}` });
-  if (it.kind === 'youtube') box.append(el('img', { src: `https://i.ytimg.com/vi/${it.videoId}/mqdefault.jpg`, alt: '', loading: 'lazy' }));
-  else if (it.kind === 'instagram') box.textContent = 'IG';
-  else box.textContent = it.service === 'Hulu' ? 'H' : it.service === 'Netflix' ? 'N' : 'TV';
+  if (it.kind === 'youtube') {
+    box.textContent = 'YouTube';
+    const img = el('img', { src: `https://i.ytimg.com/vi/${it.videoId}/mqdefault.jpg`, alt: '', loading: 'lazy' });
+    img.addEventListener('error', () => img.remove());
+    box.append(img);
+  }
+  else if (it.kind === 'instagram') box.textContent = 'Reel';
+  else box.textContent = it.service && it.service !== 'Other' ? it.service : 'TV';
   return box;
+}
+
+function iconButton(name, label, onclick, extra = '') {
+  return el('button', { type: 'button', class: `icon-btn icon-btn-sq ${extra}`.trim(), 'aria-label': label, title: label, onclick }, icon(name));
 }
 
 function renderQueue() {
@@ -422,8 +455,9 @@ function renderQueue() {
     rows.push(el('li', { class: 'q-item is-current' },
       thumbFor(room.current),
       el('div', { class: 'q-text' },
+        el('p', { class: 'q-now' }, 'Now playing'),
         el('p', { class: 'q-title' }, room.current.title),
-        el('p', { class: 'q-sub' }, `Playing now. ${kindLabel(room.current)}`)),
+        el('p', { class: 'q-sub' }, kindLabel(room.current))),
     ));
   }
   room.queue.forEach((it, i) => {
@@ -431,15 +465,16 @@ function renderQueue() {
       thumbFor(it),
       el('div', { class: 'q-text' },
         el('p', { class: 'q-title' }, it.title),
-        el('p', { class: 'q-sub' }, `${kindLabel(it)}${it.addedBy ? `. Added by ${it.addedBy}` : ''}`)),
+        el('p', { class: 'q-sub' }, `${kindLabel(it)}${it.addedBy ? ` · ${it.addedBy}` : ''}`)),
       el('div', { class: 'q-actions' },
-        el('button', { class: 'btn btn-small', onclick: () => socket.emit('queue:play', { id: it.id }) }, 'Play now'),
-        i > 0 ? el('button', { class: 'btn btn-quiet btn-small', 'aria-label': `Move ${it.title} up`, onclick: () => socket.emit('queue:move', { id: it.id, dir: 'up' }) }, 'Up') : null,
-        el('button', { class: 'btn btn-quiet btn-small', 'aria-label': `Remove ${it.title}`, onclick: () => socket.emit('queue:remove', { id: it.id }) }, 'Remove')),
+        iconButton('play', `Play ${it.title} now`, () => socket.emit('queue:play', { id: it.id }), 'q-play'),
+        i > 0 ? iconButton('up', `Move ${it.title} up`, () => socket.emit('queue:move', { id: it.id, dir: 'up' })) : null,
+        iconButton('x', `Remove ${it.title}`, () => socket.emit('queue:remove', { id: it.id }))),
     ));
   });
-  if (!rows.length) rows.push(el('li', { class: 'q-empty' }, 'Up next is empty. Add the first thing to watch.'));
+  if (!rows.length) rows.push(el('li', { class: 'q-empty' }, 'Up next is empty. Paste a link or type a show to add the first thing to watch.'));
   ol.replaceChildren(...rows);
+  $('#queueCount').textContent = room.queue.length ? String(room.queue.length) : '';
 }
 
 const looksLikeLink = (v) => /^(https?:\/\/|www\.)|^[\w-]+\.[a-z]{2,}(\/|$)/i.test(v.trim());
@@ -474,12 +509,13 @@ function renderShows() {
     el('div', { class: 'show-head' },
       el('p', { class: 'show-title' }, s.title),
       el('p', { class: 'show-service' }, s.service === 'Other' ? 'Own screen' : s.service)),
-    el('p', { class: 'show-ep', 'aria-label': `Season ${s.season}, episode ${s.episode}` }, `S${s.season} E${s.episode}`),
+    el('p', { class: 'show-ep', 'aria-label': `Season ${s.season}, episode ${s.episode}` }, `S${s.season} `, el('span', {}, '·'), ` E${s.episode}`),
     el('div', { class: 'show-actions' },
-      el('button', { class: 'btn btn-primary btn-small', onclick: () => socket.emit('show:watch', { id: s.id }) }, 'Watch together'),
-      el('button', { class: 'btn btn-small', onclick: () => socket.emit('show:finish', { id: s.id }) }, `Finished E${s.episode}`),
-      s.episode > 1 ? el('button', { class: 'btn btn-quiet btn-small', onclick: () => socket.emit('show:set', { id: s.id, season: s.season, episode: s.episode - 1 }) }, 'Back one') : null,
-      el('button', { class: 'btn btn-quiet btn-small', 'aria-label': `Remove ${s.title}`, onclick: () => socket.emit('show:remove', { id: s.id }) }, 'Remove')),
+      el('button', { type: 'button', class: 'btn btn-primary', onclick: () => socket.emit('show:watch', { id: s.id }) }, 'Watch together'),
+      el('button', { type: 'button', class: 'btn btn-secondary', onclick: () => socket.emit('show:finish', { id: s.id }) }, `Finished E${s.episode}`)),
+    el('div', { class: 'show-more' },
+      s.episode > 1 ? el('button', { type: 'button', class: 'btn btn-ghost btn-xs', onclick: () => socket.emit('show:set', { id: s.id, season: s.season, episode: s.episode - 1 }) }, 'Back one episode') : null,
+      el('button', { type: 'button', class: 'btn btn-ghost btn-xs', 'aria-label': `Remove ${s.title}`, onclick: () => socket.emit('show:remove', { id: s.id }) }, 'Remove')),
   )));
 }
 
@@ -517,11 +553,27 @@ function renderCallButtons() {
   $('#micBtn').hidden = !call.active;
   $('#camBtn').hidden = !call.active || !call.camOn;
   $('#leaveCallBtn').hidden = !call.active;
+  for (const id of ['#micBtn', '#camBtn']) {
+    const btn = $(id);
+    if (!call.active) { btn.setAttribute('aria-pressed', 'false'); btn.querySelector('span').textContent = id === '#micBtn' ? 'Mute' : 'Camera off'; }
+  }
 }
 $('#joinCallBtn').addEventListener('click', startCall);
 $('#leaveCallBtn').addEventListener('click', () => { call.leave(); renderCallButtons(); });
-$('#micBtn').addEventListener('click', (e) => { e.target.textContent = call.toggleMic() ? 'Mute' : 'Unmute'; });
-$('#camBtn').addEventListener('click', (e) => { e.target.textContent = call.toggleCam() ? 'Camera off' : 'Camera on'; });
+$('#micBtn').addEventListener('click', () => {
+  const on = call.toggleMic();
+  const btn = $('#micBtn');
+  btn.querySelector('span').textContent = on ? 'Mute' : 'Unmute';
+  btn.setAttribute('aria-pressed', String(!on));
+  btn.title = on ? 'Mute' : 'Unmute';
+});
+$('#camBtn').addEventListener('click', () => {
+  const on = call.toggleCam();
+  const btn = $('#camBtn');
+  btn.querySelector('span').textContent = on ? 'Camera off' : 'Camera on';
+  btn.setAttribute('aria-pressed', String(!on));
+  btn.title = on ? 'Turn camera off' : 'Turn camera on';
+});
 
 // ---------- reactions, toasts, invite ----------
 $('#reactions').append(...REACTIONS.map((emoji) => el('button', {
@@ -530,7 +582,7 @@ $('#reactions').append(...REACTIONS.map((emoji) => el('button', {
 
 function floatReaction({ emoji, color }) {
   const layer = $('#reactLayer');
-  const node = el('span', { class: 'float' }, emoji);
+  const node = el('span', { class: 'float', 'data-color': color }, emoji);
   node.style.left = `${10 + Math.random() * 75}%`;
   node.style.setProperty('--c', colorOf(color));
   layer.append(node);
@@ -539,17 +591,23 @@ function floatReaction({ emoji, color }) {
 
 function toast({ text, color }) {
   const box = $('#toasts');
-  const node = el('p', { class: 'toast' }, text);
-  node.style.setProperty('--c', colorOf(color));
+  const node = el('p', { class: 'toast', 'data-color': color || null }, text);
   box.append(node);
   while (box.children.length > 2) box.firstChild.remove();
   setTimeout(() => node.remove(), 3200);
 }
 
+async function copyLink() {
+  try {
+    await navigator.clipboard.writeText(`${location.origin}/r/${roomId}`);
+    toast({ text: 'Copied the room link' });
+  } catch {
+    toast({ text: `Room code: ${roomId}` });
+  }
+}
 $('#share').addEventListener('click', async () => {
   const url = `${location.origin}/r/${roomId}`;
-  try {
-    if (navigator.share) await navigator.share({ title: 'Watch with me on Couchline', url });
-    else { await navigator.clipboard.writeText(url); toast({ text: 'Copied the room link' }); }
-  } catch { /* share sheet closed */ }
+  if (!navigator.share) return copyLink();
+  try { await navigator.share({ title: 'Watch with me on Couchline', url }); } catch { /* share sheet closed */ }
 });
+$('#roomCode').addEventListener('click', copyLink);

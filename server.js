@@ -222,7 +222,7 @@ function startCountdown(room, seconds, by) {
   const launchAt = Date.now() + seconds * 1000;
   const itemId = room.current.id;
   if (room.current.kind === 'youtube') setPlayback(room, true, room.playback.playing ? posNow(room) : room.playback.position, launchAt);
-  room.countdown = { launchAt, itemId, color: by?.color || null };
+  room.countdown = { launchAt, itemId, color: by?.color || null, by: by?.name || null };
   room.countdownTimer = setTimeout(() => {
     room.countdownTimer = null;
     room.countdown = null;

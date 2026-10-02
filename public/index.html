@@ -3,77 +3,318 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1E2742">
+  <meta name="theme-color" content="#0A0B10">
+  <meta name="color-scheme" content="dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Couchline">
-  <meta name="description" content="Watch YouTube, Instagram, Netflix, and Hulu together from two places.">
-  <title>Couchline</title>
+  <meta name="description" content="Watch YouTube, Instagram, Netflix, and Hulu together from two places. Synced playback, a built-in video call, and a shared countdown.">
+  <meta property="og:title" content="Couchline: two couches, one show">
+  <meta property="og:description" content="Watch YouTube, Instagram, Netflix, and Hulu together from two places.">
+  <meta property="og:type" content="website">
+  <title>Couchline: watch together from two places</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap">
+  <link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/geist-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 
-  <main id="landing" class="view landing">
-    <div class="landing-inner">
-      <p class="pair" aria-hidden="true"><span class="seat" data-color="lamp"></span><span class="seat" data-color="rose"></span></p>
-      <h1 class="marquee">Couch&shy;line</h1>
-      <p class="lede">Watch together from two places. YouTube stays in sync on its own. Netflix, Hulu, and Instagram start on a shared countdown.</p>
-      <div class="landing-actions">
-        <button id="createRoom" class="btn btn-primary btn-big">Start a room</button>
-        <form id="joinCode" class="inline-form">
-          <label for="code" class="sr">Room code</label>
-          <input id="code" placeholder="Have a code? Type it" autocomplete="off" autocapitalize="off" spellcheck="false">
-          <button class="btn">Join</button>
-        </form>
-      </div>
-    </div>
-  </main>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="mark" viewBox="0 0 512 512"><rect width="512" height="512" rx="120" fill="#1F232D"/><rect x="96" y="252" width="320" height="112" rx="44" fill="#3A4053"/><circle cx="196" cy="214" r="56" fill="#F5B942"/><circle cx="316" cy="214" r="56" fill="#F48A8F"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4M12 2v13"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+      <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+      <symbol id="i-skip" viewBox="0 0 24 24"><path d="m5 4 10 8-10 8z"/><path d="M19 5v14"/></symbol>
+      <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+      <symbol id="i-hangup" viewBox="0 0 24 24"><path d="M3 15c5-5 13-5 18 0l-2 3-4-1v-3c-2-.6-4-.6-6 0v3l-4 1z"/></symbol>
+      <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 21V5M4 5h11l-2 4 2 4H4"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/></symbol>
+      <symbol id="i-remote" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3"/><path d="M12 6v4M10 8h4M12 17h.01"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+      <symbol id="i-install" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+      <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-tv" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+    </defs>
+  </svg>
 
+  <!-- ============ landing ============ -->
+  <div id="landing" class="view landing">
+    <header class="site-nav">
+      <div class="wrap site-nav-inner">
+        <a href="/" class="brand"><svg class="brand-mark" aria-hidden="true"><use href="#mark"/></svg><span>Couchline</span></a>
+        <nav class="site-links" aria-label="Sections">
+          <a href="#watch">What you can watch</a>
+          <a href="#how">How it works</a>
+          <a href="#features">Features</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <button type="button" class="btn btn-primary btn-sm" data-create-room>Start a room</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="wrap hero">
+        <div class="hero-copy">
+          <p class="chip-pair"><span class="pair" aria-hidden="true"><span data-color="lamp"></span><span data-color="rose"></span></span>Watch parties for two</p>
+          <h1 class="hero-title">Two couches.<br><span>One show.</span></h1>
+          <p class="hero-lede">Couchline keeps YouTube in sync on both screens, puts a video call right beside it, and counts you both in for Netflix, Hulu and Instagram.</p>
+          <div class="hero-actions">
+            <button type="button" id="createRoom" class="btn btn-primary btn-lg" data-create-room>Start a room <svg class="i" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+            <form id="joinCode" class="code-form">
+              <label for="code" class="sr">Room code</label>
+              <input id="code" placeholder="Have a room code?" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go">
+              <button class="btn btn-secondary">Join</button>
+            </form>
+          </div>
+          <ul class="hero-checks">
+            <li><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>No sign-up</li>
+            <li><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Phones, laptops and TV browsers</li>
+            <li><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Video call built in</li>
+          </ul>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="mock-window">
+            <div class="mock-top">
+              <span class="mock-code"><svg><use href="#mark"/></svg>amber-otter-4821</span>
+              <span class="mock-roster"><span data-color="lamp">Mia</span><span data-color="rose">Sam</span></span>
+            </div>
+            <div class="scene">
+              <span class="scene-sun"></span><span class="scene-hill a"></span><span class="scene-hill b"></span><span class="scene-ground"></span>
+              <span class="scene-caption"><small>YouTube</small>Dolomites at sunset</span>
+              <span class="scene-react" data-color="rose">😂</span>
+              <span class="scene-react small" data-color="lamp">😍</span>
+            </div>
+            <div class="mock-transport">
+              <span class="mock-scrub"><span></span></span>
+              <span class="mock-row">
+                <span class="mock-play"><svg viewBox="0 0 24 24"><path d="M6 4.5h4v15H6zm8 0h4v15h-4z"/></svg></span>
+                <svg class="i"><use href="#i-back"/></svg><svg class="i"><use href="#i-fwd"/></svg>
+                <span class="mock-time">14:32 <span>/ 38:10</span></span>
+                <span class="pill pill-ok">In sync</span>
+              </span>
+            </div>
+          </div>
+          <div class="mock-tiles">
+            <span class="mock-tile" data-color="lamp"><b>M</b><i>Mia</i></span>
+            <span class="mock-tile" data-color="rose"><b>S</b><i>Sam</i></span>
+          </div>
+          <div class="mock-phone">
+            <div>
+              <small>Netflix · S2 E4</small>
+              <strong data-color="rose">3</strong>
+              <span>Sam started the countdown</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="watch" class="band">
+        <div class="wrap">
+          <p class="eyebrow">What you can watch</p>
+          <h2 class="section-title">Works with what you already watch.</h2>
+          <p class="section-lede">YouTube plays inside Couchline and stays locked in sync. For apps no website can control, Couchline counts you both in to the same second.</p>
+          <div class="cards">
+            <article class="card">
+              <div class="card-head"><h3>YouTube</h3><span class="pill pill-ok">Auto sync</span></div>
+              <p>Play, pause and seeking are shared. Both screens stay within about half a second of each other.</p>
+              <div class="card-demo demo-sync" aria-hidden="true">
+                <span data-color="lamp"><b>Mia</b><i><em></em></i><code>23:41</code></span>
+                <span data-color="rose"><b>Sam</b><i><em></em></i><code>23:41</code></span>
+              </div>
+            </article>
+            <article class="card">
+              <div class="card-head"><h3>Netflix and Hulu</h3><span class="pill">Countdown</span></div>
+              <p>You each play on your own account. Couchline counts you in together and keeps your place in the series.</p>
+              <div class="card-demo demo-count" aria-hidden="true"><span>3</span><span>2</span><span class="on">1</span><b>Press play</b></div>
+            </article>
+            <article class="card">
+              <div class="card-head"><h3>Instagram reels</h3><span class="pill">Countdown</span></div>
+              <p>Paste a reel and it opens right in the room. A shared countdown tells you both when to tap play.</p>
+              <div class="card-demo demo-link" aria-hidden="true"><span class="icon-tile"><svg class="i"><use href="#i-link"/></svg></span><code>instagram.com/reel/…</code></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="how" class="band band-alt">
+        <div class="wrap">
+          <p class="eyebrow">How it works</p>
+          <h2 class="section-title">Three steps to the same second.</h2>
+          <ol class="cards steps">
+            <li class="card">
+              <span class="step-num">01</span>
+              <h3>Start a room</h3>
+              <p>One tap gives you a private room with an easy-to-say name.</p>
+              <span class="step-demo mono">amber-otter-4821</span>
+            </li>
+            <li class="card">
+              <span class="step-num">02</span>
+              <h3>Send the link</h3>
+              <p>Your person opens it on any device and picks a name. No account, no download.</p>
+              <span class="step-demo step-demo-btn"><svg class="i" aria-hidden="true"><use href="#i-share"/></svg>Invite</span>
+            </li>
+            <li class="card">
+              <span class="step-num">03</span>
+              <h3>Press play</h3>
+              <p>Pause, seek, skip or react. Both screens follow, and the call stays on beside the video.</p>
+              <span class="pill pill-ok pill-lg">In sync</span>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="features" class="band">
+        <div class="wrap">
+          <p class="eyebrow">Features</p>
+          <h2 class="section-title">Everything movie night needs. Nothing it doesn’t.</h2>
+          <div class="features">
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-video"/></svg></span><h3>Video call built in</h3><p>See each other react in a call that sits beside the video. Mute or turn off your camera anytime.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-smile"/></svg></span><h3>Reactions</h3><p>Tap a reaction and it floats up on both screens, marked with your color.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-list"/></svg></span><h3>Shared Up next</h3><p>Either of you can add, reorder or skip. Paste a link or type the name of a show.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-flag"/></svg></span><h3>Keeps your place</h3><p>The Shows tab tracks your season and episode, so nobody watches ahead by accident.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-pause"/></svg></span><h3>Pauses when someone drops</h3><p>If one of you loses connection or starts buffering, the room waits until you’re both back.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-remote"/></svg></span><h3>Phone as a remote</h3><p>Play on a TV browser and control everything from the phone in your hand.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg></span><h3>Keeps the screen awake</h3><p>Phones won’t dim or lock mid-episode while something is playing.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-install"/></svg></span><h3>Installs like an app</h3><p>Add it to your home screen on iPhone or Android and it opens full screen.</p></div>
+          </div>
+
+          <div class="tips">
+            <h3>Before you press play</h3>
+            <div class="tips-grid">
+              <p><svg class="i" aria-hidden="true"><use href="#i-headphones"/></svg><span><strong>Wear headphones.</strong> Otherwise the call mic picks up the show.</span></p>
+              <p><svg class="i" aria-hidden="true"><use href="#i-phone"/></svg><span><strong>On iPhone, tap the first video once.</strong> After that it syncs on its own.</span></p>
+              <p><svg class="i" aria-hidden="true"><use href="#i-tv"/></svg><span><strong>Netflix and Hulu:</strong> open the episode, pause at the start, then tap Start together.</span></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" class="band band-alt">
+        <div class="wrap faq">
+          <div>
+            <p class="eyebrow">FAQ</p>
+            <h2 class="section-title">Good questions.</h2>
+          </div>
+          <div class="faq-list">
+            <details open>
+              <summary>Can Couchline control Netflix or Hulu?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>No website can, so you each play on your own account and screen. Couchline runs a shared countdown so you press play at the same moment, and the Shows tab remembers which episode you’re on.</p>
+            </details>
+            <details>
+              <summary>Do we need accounts?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>No. Start a room, send the link, and each of you picks a name. Your queue and shows are saved in your browser.</p>
+            </details>
+            <details>
+              <summary>Who can join my room?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>Anyone with the link. Room codes are random and hard to guess, but there’s no password yet, so share it only with the people you’re watching with.</p>
+            </details>
+            <details>
+              <summary>What happens with YouTube ads?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>Ads play separately for each of you. Couchline catches whoever watched an ad back up afterward. YouTube Premium skips them entirely.</p>
+            </details>
+            <details>
+              <summary>Will the call work on cell data?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>Usually. Some cell and work networks block direct calls; adding a relay server on the host fixes that. Watching still works either way.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="band final">
+        <div class="wrap final-inner">
+          <span class="pair pair-lg" aria-hidden="true"><span data-color="lamp"></span><span data-color="rose"></span></span>
+          <h2>Save them a seat.</h2>
+          <p>Start a room and send the link. Joining takes one tap.</p>
+          <button type="button" class="btn btn-primary btn-lg" data-create-room>Start a room <svg class="i" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap site-footer-inner">
+        <span class="brand brand-sm"><svg class="brand-mark" aria-hidden="true"><use href="#mark"/></svg><span>Couchline</span><small>Watch together from two places.</small></span>
+        <span>Sync and call adapted from <a href="https://github.com/howardchung/watchparty" rel="noopener">WatchParty</a> (MIT)</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ============ entry ============ -->
   <section id="entry" class="view entry" hidden>
+    <header class="entry-top"><a href="/" class="brand"><svg class="brand-mark" aria-hidden="true"><use href="#mark"/></svg><span>Couchline</span></a></header>
+    <div class="entry-art" aria-hidden="true"><span class="pair pair-xl"><span data-color="rose"></span><span class="seat-empty"></span></span></div>
     <form id="entryForm" class="sheet">
-      <p class="sheet-room">Room <strong id="entryRoom"></strong></p>
-      <h2>Take a seat</h2>
+      <div>
+        <p class="room-chip"><span class="live-dot"></span><span id="entryRoom"></span></p>
+        <h1 class="sheet-title">Take a seat</h1>
+        <p class="sheet-sub">Pick a name so the other person knows it’s you.</p>
+      </div>
       <label class="field">Your name
-        <input id="name" maxlength="24" required autocomplete="nickname" enterkeyhint="go">
+        <input id="name" maxlength="24" required autocomplete="nickname" enterkeyhint="go" placeholder="Your name">
       </label>
-      <label class="check"><input type="checkbox" id="optCall" checked> <span>Join the video call</span></label>
-      <label class="check"><input type="checkbox" id="optRemote"> <span>Use this device as a remote <small>The video plays on another screen, like a TV browser.</small></span></label>
-      <p class="hint">Wear headphones so the call doesn’t pick up the show.</p>
-      <button class="btn btn-primary btn-big">Enter room</button>
+      <div class="options">
+        <label class="option">
+          <span class="icon-tile icon-tile-sm"><svg class="i" aria-hidden="true"><use href="#i-video"/></svg></span>
+          <span class="option-text"><span>Join the video call</span><small>Camera and mic, beside the video</small></span>
+          <input type="checkbox" id="optCall" class="switch" checked>
+        </label>
+        <label class="option">
+          <span class="icon-tile icon-tile-sm"><svg class="i" aria-hidden="true"><use href="#i-remote"/></svg></span>
+          <span class="option-text"><span>Use as a remote</span><small>The video plays on another screen, like a TV</small></span>
+          <input type="checkbox" id="optRemote" class="switch">
+        </label>
+      </div>
+      <p class="note"><svg class="i" aria-hidden="true"><use href="#i-headphones"/></svg>Wear headphones so the call doesn’t pick up the show.</p>
+      <button class="btn btn-primary btn-lg btn-block">Enter room</button>
     </form>
   </section>
 
+  <!-- ============ room ============ -->
   <section id="room" class="view room" hidden>
     <header class="topbar">
-      <a href="/" class="brand">Couchline</a>
+      <a href="/" class="brand"><svg class="brand-mark" aria-hidden="true"><use href="#mark"/></svg><span>Couchline</span></a>
+      <span class="topbar-divider" aria-hidden="true"></span>
+      <button type="button" id="roomCode" class="code-chip" aria-label="Copy room link"><span id="roomCodeText"></span><svg class="i" aria-hidden="true"><use href="#i-copy"/></svg></button>
       <ul id="roster" class="roster" aria-label="In the room"></ul>
-      <button id="share" class="btn btn-quiet btn-small">Invite</button>
+      <button type="button" id="share" class="btn btn-primary btn-sm topbar-invite"><svg class="i" aria-hidden="true"><use href="#i-share"/></svg><span>Invite</span></button>
     </header>
 
     <div class="layout">
       <div class="main">
-        <div id="stage" class="stage">
+        <div id="stage" class="stage" data-kind="empty">
           <div id="emptyStage" class="empty-stage">
+            <span class="icon-tile icon-tile-lg"><svg class="i" aria-hidden="true"><use href="#i-tv"/></svg></span>
             <p class="empty-title">Nothing’s on yet</p>
-            <p class="hint">Paste a YouTube or Instagram link, or type a show name.</p>
+            <p class="empty-hint">Paste a YouTube or Instagram link in Up next, or type the name of a show.</p>
           </div>
 
           <div id="ytWrap" class="fill" hidden>
             <div id="yt"></div>
             <button id="tapShield" class="tap-shield" aria-label="Play or pause"></button>
-            <p id="tapToStart" class="tap-banner" hidden>Tap the video once to start it on this device.</p>
+            <p id="tapToStart" class="tap-banner" hidden>Tap the video once to start it on this device</p>
           </div>
 
           <div id="remotePoster" class="fill remote-poster" hidden>
             <img id="remoteThumb" alt="">
-            <p>This device is the remote.</p>
+            <p><svg class="i" aria-hidden="true"><use href="#i-remote"/></svg>This device is the remote</p>
           </div>
 
           <div id="igWrap" class="ig-wrap" hidden>
@@ -84,54 +325,65 @@
             <p id="streamService" class="stream-service"></p>
             <h2 id="streamTitle" class="stream-title"></h2>
             <p id="streamEp" class="stream-ep"></p>
-            <p class="hint">Open it on your own screen and pause at the start. When you’re both ready, tap Start together.</p>
+            <p class="stream-hint">Open it on your own screen and pause at the start. When you’re both ready, tap Start together.</p>
           </div>
 
           <div id="countdown" class="countdown" hidden aria-live="assertive">
+            <p id="countBy" class="count-by"></p>
             <span id="countNum" class="count-num"></span>
-            <button id="cancelCountdown" class="btn btn-quiet btn-small">Cancel</button>
+            <p id="countHint" class="count-hint"></p>
+            <button id="cancelCountdown" class="btn btn-ghost btn-sm">Cancel</button>
           </div>
           <div id="goFlash" class="go-flash" hidden aria-live="assertive"></div>
           <div id="reactLayer" class="react-layer" aria-hidden="true"></div>
         </div>
 
         <div id="controls" class="controls" hidden>
-          <button id="playBtn" class="ctl ctl-play" aria-label="Play">
-            <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>
-            <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h4v15H6zm8 0h4v15h-4z"/></svg>
-          </button>
-          <button id="back10" class="ctl" aria-label="Back 10 seconds">-10</button>
-          <button id="fwd10" class="ctl" aria-label="Forward 10 seconds">+10</button>
-          <span class="readout">
-            <span id="time" class="time">0:00</span>
-            <span id="syncPill" class="sync-pill">In sync</span>
-          </span>
-          <button id="skipBtn" class="ctl ctl-text">Skip</button>
-          <input type="range" id="scrub" class="scrub" min="0" max="1" step="0.1" value="0" aria-label="Seek">
+          <div class="scrub-row">
+            <input type="range" id="scrub" class="scrub" min="0" max="1" step="0.1" value="0" aria-label="Seek">
+          </div>
+          <div class="transport">
+            <span class="readout"><span id="time" class="time">0:00</span><span id="timeDur" class="time time-dur"></span></span>
+            <span id="syncPill" class="pill pill-ok sync-pill">In sync</span>
+            <span class="cluster">
+              <button id="back10" class="icon-btn" aria-label="Back 10 seconds"><svg class="i" aria-hidden="true"><use href="#i-back"/></svg></button>
+              <button id="playBtn" class="play-btn" aria-label="Play">
+                <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>
+                <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h4v15H6zm8 0h4v15h-4z"/></svg>
+              </button>
+              <button id="fwd10" class="icon-btn" aria-label="Forward 10 seconds"><svg class="i" aria-hidden="true"><use href="#i-fwd"/></svg></button>
+            </span>
+            <button id="skipBtn" class="btn btn-secondary btn-sm skip-btn" aria-label="Skip to next"><svg class="i" aria-hidden="true"><use href="#i-skip"/></svg><span>Skip</span></button>
+          </div>
         </div>
 
         <div id="startBar" class="start-bar" hidden>
-          <button id="startTogether" class="btn btn-primary">Start together</button>
-          <a id="openExternal" class="btn btn-quiet" target="_blank" rel="noopener" hidden>Open</a>
-          <button id="skipExternal" class="btn btn-quiet">Skip</button>
+          <button id="startTogether" class="btn btn-primary btn-lg">Start together</button>
+          <a id="openExternal" class="btn btn-secondary btn-lg" target="_blank" rel="noopener" hidden>Open</a>
+          <button id="skipExternal" class="btn btn-ghost btn-lg">Skip</button>
         </div>
 
-        <div class="reactions" id="reactions" aria-label="Send a reaction"></div>
-
-        <section id="call" class="call" aria-label="Video call">
-          <div id="tiles" class="tiles"></div>
-          <div class="call-buttons">
-            <button id="joinCallBtn" class="btn btn-small">Join call</button>
-            <button id="micBtn" class="btn btn-small" hidden>Mute</button>
-            <button id="camBtn" class="btn btn-small" hidden>Camera off</button>
-            <button id="leaveCallBtn" class="btn btn-quiet btn-small" hidden>Leave call</button>
-          </div>
-        </section>
+        <div class="dock">
+          <section id="call" class="call" aria-label="Video call">
+            <div id="tiles" class="tiles"></div>
+            <div class="call-off">
+              <span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-video"/></svg></span>
+              <span><strong>You’re not on the call</strong><small>Join to see each other while you watch.</small></span>
+            </div>
+            <div class="call-buttons">
+              <button id="joinCallBtn" class="btn btn-primary btn-sm"><svg class="i" aria-hidden="true"><use href="#i-video"/></svg>Join call</button>
+              <button id="micBtn" class="call-btn" aria-pressed="false" hidden><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><span>Mute</span></button>
+              <button id="camBtn" class="call-btn" aria-pressed="false" hidden><svg class="i" aria-hidden="true"><use href="#i-video"/></svg><span>Camera off</span></button>
+              <button id="leaveCallBtn" class="call-btn call-btn-danger" hidden><svg class="i" aria-hidden="true"><use href="#i-hangup"/></svg><span>Leave</span></button>
+            </div>
+          </section>
+          <div class="reactions" id="reactions" role="group" aria-label="Send a reaction"></div>
+        </div>
       </div>
 
       <aside class="panel">
         <div class="tabs" role="tablist">
-          <button role="tab" id="tabNextBtn" aria-selected="true" aria-controls="tabNext">Up next</button>
+          <button role="tab" id="tabNextBtn" aria-selected="true" aria-controls="tabNext">Up next <span id="queueCount" class="tab-count"></span></button>
           <button role="tab" id="tabShowsBtn" aria-selected="false" aria-controls="tabShows">Shows</button>
         </div>
 
@@ -139,27 +391,30 @@
           <form id="addForm" class="add-form">
             <label for="addInput" class="sr">Link or show name</label>
             <input id="addInput" placeholder="Paste a link or type a show" autocomplete="off" enterkeyhint="done">
+            <button class="btn btn-primary">Add</button>
             <label for="addService" class="sr">Service</label>
             <select id="addService" hidden><option>Netflix</option><option>Hulu</option><option>Other</option></select>
-            <button class="btn btn-primary">Add</button>
           </form>
           <p id="addError" class="error" hidden></p>
           <ol id="queue" class="queue"></ol>
         </div>
 
         <div id="tabShows" class="tab" role="tabpanel" aria-labelledby="tabShowsBtn" hidden>
-          <p class="hint">Keep your shared place in a series, so nobody gets ahead by accident.</p>
+          <p class="panel-hint">Keep your shared place in a series, so nobody gets ahead by accident.</p>
           <ul id="shows" class="shows"></ul>
           <form id="showForm" class="show-form">
-            <label class="field">Show <input id="showTitle" maxlength="80" required placeholder="The Bear"></label>
-            <label class="field">On
+            <p class="show-form-title">Add a show</p>
+            <label class="field field-wide">Show <input id="showTitle" maxlength="80" required placeholder="The Bear"></label>
+            <label class="field field-wide">On
               <select id="showService"><option>Netflix</option><option>Hulu</option><option>Other</option></select>
             </label>
-            <label class="field field-num">Season <input id="showSeason" type="number" min="1" max="99" value="1" inputmode="numeric"></label>
-            <label class="field field-num">Episode <input id="showEpisode" type="number" min="1" max="999" value="1" inputmode="numeric"></label>
-            <button class="btn">Add show</button>
+            <label class="field">Season <input id="showSeason" type="number" min="1" max="99" value="1" inputmode="numeric"></label>
+            <label class="field">Episode <input id="showEpisode" type="number" min="1" max="999" value="1" inputmode="numeric"></label>
+            <button class="btn btn-secondary field-wide">Add show</button>
           </form>
         </div>
+
+        <p class="kbd-hint">Space plays or pauses. Arrow keys jump 10 seconds.</p>
       </aside>
     </div>
     <div id="toasts" class="toasts" aria-live="polite"></div>
