@@ -50,7 +50,7 @@ export function initPopout({ call, getRoom, onChange }) {
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     const cw = w / cols;
     const ch = h / rows;
-    ctx.fillStyle = css('--screen') || '#131A31';
+    ctx.fillStyle = css('--screen') || '#0C0D12';
     ctx.fillRect(0, 0, w, h);
     list.forEach(({ t, m }, i) => {
       const x = (i % cols) * cw;
@@ -65,23 +65,23 @@ export function initPopout({ call, getRoom, onChange }) {
       }
       const color = m?.color ? css(`--${m.color}`) : css('--line');
       ctx.lineWidth = 8;
-      ctx.strokeStyle = color || '#3C4878';
+      ctx.strokeStyle = color || '#262A36';
       ctx.strokeRect(x + 4, y + 4, cw - 8, ch - 8);
       const name = m?.name || '';
-      ctx.font = `700 ${audioOnly ? 44 : 30}px "Bricolage Grotesque", system-ui, sans-serif`;
+      ctx.font = `600 ${audioOnly ? 44 : 30}px "Geist", system-ui, sans-serif`;
       if (audioOnly) {
-        ctx.fillStyle = color || '#EEF0F7';
+        ctx.fillStyle = color || '#F3F4F7';
         ctx.textAlign = 'center';
         ctx.fillText(name, x + cw / 2, y + ch / 2 + 14);
         ctx.textAlign = 'left';
       } else if (name) {
         const tw = ctx.measureText(name).width;
-        ctx.fillStyle = 'rgba(19, 26, 49, 0.75)';
+        ctx.fillStyle = 'rgba(10, 11, 16, 0.78)';
         ctx.beginPath();
         ctx.roundRect?.(x + 16, y + ch - 62, tw + 32, 46, 23);
         if (!ctx.roundRect) ctx.rect(x + 16, y + ch - 62, tw + 32, 46);
         ctx.fill();
-        ctx.fillStyle = '#EEF0F7';
+        ctx.fillStyle = '#F3F4F7';
         ctx.fillText(name, x + 32, y + ch - 28);
       }
     });

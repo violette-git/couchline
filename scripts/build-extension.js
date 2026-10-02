@@ -19,6 +19,9 @@ const FILES = [
   { from: 'public/media.js', to: 'extension/lib/media.js', header: notice('public/media.js') },
   { from: 'node_modules/socket.io/client-dist/socket.io.min.js', to: 'extension/lib/socket.io.min.js' },
   { from: 'public/icon-192.png', to: 'extension/icons/icon-192.png' },
+  // The stylesheet loads Geist from /fonts, which in the extension is its own fonts folder.
+  ...['geist-latin', 'geist-latin-ext', 'geist-mono-latin', 'geist-mono-latin-ext'].map((f) => ({ from: `public/fonts/${f}-wght-normal.woff2`, to: `extension/fonts/${f}-wght-normal.woff2` })),
+  { from: 'public/fonts/OFL.txt', to: 'extension/fonts/OFL.txt' },
 ];
 
 function expected(f) {
@@ -33,7 +36,7 @@ const same = (a, b, binary) => (binary ? a.equals(b) : lf(a) === lf(b));
 export function staleFiles() {
   return FILES.filter((f) => {
     const target = path.join(root, f.to);
-    return !fs.existsSync(target) || !same(fs.readFileSync(target), expected(f), f.to.endsWith('.png'));
+    return !fs.existsSync(target) || !same(fs.readFileSync(target), expected(f), /\.(png|woff2)$/.test(f.to));
   }).map((f) => f.to);
 }
 
