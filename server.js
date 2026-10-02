@@ -5,6 +5,8 @@ import express from 'express';
 import http from 'node:http';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import { zipSync, strToU8 } from 'fflate';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { parseMedia, mediaWarnings, IN_BOX, EXT_SERVICES } from './public/media.js';
@@ -37,6 +39,47 @@ app.get('/r/:roomId', (_req, res) => res.sendFile(path.join(__dirname, 'public',
 // The phone share sheet (Android, or an iPhone Shortcut) opens /share?url=..., and the page
 // adds it to the last room this device was in.
 app.get('/share', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+// ---------- the browser extension, as a download ----------
+// Zipped straight from the extension folder of whatever is deployed, so it's never stale.
+// The zip also carries this site's address (defaults.json), so the extension starts out
+// pointed at the right Couchline and people only add their room code and name.
+const EXT_DIR = path.join(__dirname, 'extension');
+const EXT_VERSION = JSON.parse(fs.readFileSync(path.join(EXT_DIR, 'manifest.json'), 'utf8')).version;
+let extFiles = null;
+function extensionFiles() {
+  if (extFiles) return extFiles;
+  extFiles = {};
+  const walk = (dir) => {
+    for (const name of fs.readdirSync(dir)) {
+      const full = path.join(dir, name);
+      if (fs.statSync(full).isDirectory()) walk(full);
+      else extFiles[`couchline-extension/${path.relative(EXT_DIR, full).split(path.sep).join('/')}`] = new Uint8Array(fs.readFileSync(full));
+    }
+  };
+  walk(EXT_DIR);
+  return extFiles;
+}
+const extZips = new Map(); // site address -> zip
+function extensionZip(origin) {
+  if (!extZips.has(origin)) {
+    if (extZips.size > 20) extZips.clear();
+    const defaults = strToU8(`${JSON.stringify({ server: origin }, null, 2)}\n`);
+    extZips.set(origin, Buffer.from(zipSync({ ...extensionFiles(), 'couchline-extension/defaults.json': defaults }, { level: 9 })));
+  }
+  return extZips.get(origin);
+}
+const siteOrigin = (req) => {
+  const proto = (req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim();
+  const host = str(req.get('host'), 200).replace(/[^\w.:-]/g, '');
+  return `${proto === 'https' ? 'https' : 'http'}://${host}`;
+};
+app.get('/couchline-extension.zip', (req, res) => {
+  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="couchline-extension.zip"', 'Cache-Control': 'no-cache' });
+  res.send(extensionZip(siteOrigin(req)));
+});
+app.get('/extension', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'extension.html')));
+app.get('/extension/info', (req, res) => res.json({ version: EXT_VERSION, size: extensionZip(siteOrigin(req)).length }));
 
 const server = http.createServer(app);
 const io = new Server(server, { pingInterval: 10000, pingTimeout: 8000, maxHttpBufferSize: 1e5 });

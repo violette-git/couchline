@@ -3,8 +3,10 @@
 const $ = (s) => document.querySelector(s);
 const status = (text) => { $('#status').textContent = text; };
 
-chrome.storage.local.get(['server', 'room', 'name'], (s) => {
-  $('#server').value = s.server || '';
+chrome.storage.local.get(['server', 'room', 'name'], async (s) => {
+  // The download from a Couchline site includes its address (defaults.json).
+  const d = s.server ? {} : await fetch(chrome.runtime.getURL('defaults.json')).then((r) => r.json()).catch(() => ({}));
+  $('#server').value = s.server || d.server || '';
   $('#room').value = s.room || '';
   $('#name').value = s.name || '';
 });

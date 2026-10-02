@@ -231,6 +231,21 @@ crowd.forEach((s) => s.disconnect());
 back.disconnect();
 check.ok('groups: distinct colors, five cameras, audio past that, spots passed on in order, kept across reconnects');
 
+// ---- the extension download ----
+const { unzipSync, strFromU8 } = await import('fflate');
+const zr = await fetch(`http://localhost:${PORT}/couchline-extension.zip`, { headers: { 'X-Forwarded-Proto': 'https' } });
+assert.equal(zr.status, 200);
+assert.equal(zr.headers.get('content-type'), 'application/zip');
+const files = unzipSync(new Uint8Array(await zr.arrayBuffer()));
+assert.ok(files['couchline-extension/manifest.json'], 'the manifest is at the top of the folder');
+assert.ok(files['couchline-extension/background.js'] && files['couchline-extension/lib/call.js'] && files['couchline-extension/sidebar/sidebar.html']);
+assert.equal(JSON.parse(strFromU8(files['couchline-extension/defaults.json'])).server, `https://localhost:${PORT}`, 'it carries the site address');
+const info = await (await fetch(`http://localhost:${PORT}/extension/info`)).json();
+assert.match(info.version, /^\d+\.\d+\.\d+$/);
+assert.ok(info.size > 10000);
+assert.equal((await fetch(`http://localhost:${PORT}/extension`)).status, 200);
+check.ok('the extension downloads from the site, pre-set to its address, with an install page');
+
 // ---- chat and history come back after a restart ----
 const e = client(PORT, 'Ana', 'social-room-2', { cache: { queue: [], shows: [], played: [{ kind: 'youtube', url: 'https://youtu.be/dQw4w9WgXcQ', title: 'Old one' }, { kind: 'bogus' }], chat: a.last ? [{ text: 'hi again', name: 'Ana', color: 'lamp', at: 1 }, { text: '' }] : [], history: [{ title: 'Big Buck Bunny', kind: 'vimeo', votes: [{ name: 'Ana', score: 9, color: 'lamp' }] }] } });
 const je = await e.joined;

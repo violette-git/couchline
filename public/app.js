@@ -41,6 +41,8 @@ if (handleShareLanding()) {
   roomId = routeMatch[1].toLowerCase();
   $('#entryRoom').textContent = roomId;
   for (const id of ['#roomCodeTop', '#roomMenuCode', '#emptyCode']) $(id).textContent = roomId;
+  // The extension page shows this room's code, and links back here.
+  for (const a of document.querySelectorAll('.ext-room-link')) a.href = `/extension?room=${roomId}`;
   $('#name').value = store.get('name', '');
   $('#optRemote').checked = store.get('remote', false);
   show('entry');
@@ -309,6 +311,8 @@ function renderExtNote(cur) {
   const missing = viewers.filter((m) => m.ext !== cur.service);
   hint.hidden = extSynced();
   becomeRemote.hidden = true;
+  // Offer the extension wherever it would help: Netflix or Hulu, not yet synced, on a computer.
+  $('#extGet').hidden = !supported || extSynced() || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
   if (!supported) { note.hidden = true; return; }
   note.hidden = false;
   if (extSynced()) {

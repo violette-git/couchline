@@ -84,9 +84,12 @@ function readForm() {
   return { server, roomId: normalizeRoom(roomId), name: $('#name').value.trim().slice(0, 24), withCall: $('#optCall').checked };
 }
 
+// The download from a Couchline site includes its address (defaults.json).
+const defaults = () => fetch(chrome.runtime.getURL('defaults.json')).then((r) => r.json()).catch(() => ({}));
+
 async function fillForm() {
   const saved = await chrome.storage.local.get(['server', 'name', 'withCall']);
-  $('#server').value = params.get('server') || saved.server || '';
+  $('#server').value = params.get('server') || saved.server || (await defaults()).server || '';
   $('#room').value = params.get('room') || '';
   $('#name').value = saved.name || '';
   $('#optCall').checked = saved.withCall ?? true;
