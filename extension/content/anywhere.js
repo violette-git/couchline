@@ -35,12 +35,15 @@
       const css = await (await fetch(chrome.runtime.getURL('lib/styles.css'))).text();
       const sheet = new CSSStyleSheet();
       sheet.replaceSync(`${css.replace(/:root\s*\{/, ':host {')}
-        .cl-pill { font: 700 0.9rem var(--font); color: var(--paper); box-shadow: 0 6px 20px rgb(8 12 26 / 0.45); }
-        .cl-card { width: 280px; display: grid; gap: 0.6rem; padding: 0.9rem; margin-bottom: 0.5rem; border-radius: var(--r-large); background: var(--night); color: var(--paper); border: 1px solid var(--line); box-shadow: 0 16px 40px rgb(8 12 26 / 0.5); font: 400 0.92rem/1.4 var(--font); }
+        .cl-pill { font: 700 0.9rem var(--font); color: var(--paper); padding-inline: 0.95rem; background: rgb(30 39 66 / 0.92); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 1px 0 var(--edge), 0 8px 24px rgb(8 12 26 / 0.45); }
+        .cl-pill:hover { background: var(--night-3); transform: translateY(-1px); }
+        .cl-card { width: 288px; display: grid; gap: 0.65rem; padding: 1rem; margin-bottom: 0.6rem; border-radius: var(--r-large); background: radial-gradient(120% 90% at 50% -20%, var(--glow), transparent 65%), var(--night); color: var(--paper); border: 1px solid var(--line); box-shadow: inset 0 1px 0 var(--edge), var(--shadow-3); font: 400 0.92rem/1.4 var(--font); transform-origin: bottom left; animation: pop-in var(--t-med) var(--ease-out) backwards; }
         .cl-card p { margin: 0; }
+        .cl-card > p:first-child { font-weight: 700; }
         .cl-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
         .cl-note { color: var(--muted); font-size: 0.85rem; }
-        .cl-sharing { color: var(--paper); font-weight: 700; }`);
+        .cl-sharing { color: var(--paper); font-weight: 700; }
+        @media (prefers-reduced-motion: reduce) { .cl-card { animation: none; } .cl-pill:hover { transform: none; } }`);
       shadow.adoptedStyleSheets = [sheet];
     } catch { /* unstyled still works */ }
     ui = {
