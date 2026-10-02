@@ -4,8 +4,8 @@
   "description": "Watch YouTube, Instagram, Netflix, and Hulu together from two places.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1E2742",
-  "theme_color": "#1E2742",
+  "background_color": "#0A0B10",
+  "theme_color": "#0A0B10",
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" },
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
