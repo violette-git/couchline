@@ -67,6 +67,7 @@ export class Call {
     const self = this.tile(this.selfId);
     self.video.muted = true;
     self.video.srcObject = this.stream;
+    this.applyMirror();
     this.socket.emit('call:state', { inCall: true });
     this.sync(this.members);
     return true;
@@ -134,8 +135,23 @@ export class Call {
       const self = this.tile(this.selfId);
       self.el.classList.toggle('cam-off', !track.enabled);
       self.video.srcObject = this.stream;
+      this.applyMirror();
     }
     return true;
+  }
+
+  // Your own picture shows mirrored, like a mirror, so moving right moves right. Only on your
+  // screen: everyone else sees you the right way round. Rear cameras aren't mirrored.
+  get mirror() { return prefs.get().mirror !== false; }
+  setMirror(on) {
+    prefs.set({ mirror: !!on });
+    this.applyMirror();
+  }
+  applyMirror() {
+    const t = this.tiles.get(this.selfId);
+    if (!t) return;
+    const facing = this.stream?.getVideoTracks()[0]?.getSettings?.().facingMode;
+    t.el.classList.toggle('mirror', this.mirror && facing !== 'environment');
   }
 
   toggleMic() {

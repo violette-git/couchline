@@ -33,3 +33,7 @@ SOFTWARE.
 Third-party libraries served or packaged by Couchline keep their own licenses:
 - hls.js (Apache License 2.0), served from node_modules at /vendor/hls/
 - Socket.IO client (MIT), packaged as extension/lib/socket.io.min.js
+- qrcode-generator by Kazuhiko Arase (MIT), served from node_modules at /vendor/qrcode/
+
+Show search uses the TVmaze API (https://www.tvmaze.com/api). TVmaze data is licensed
+CC BY-SA 4.0; Couchline credits TVmaze next to the show search.

@@ -7,23 +7,9 @@ import { FilePlayer } from './players/file.js';
 import { parseMedia, mediaWarnings, IN_BOX } from './media.js';
 import { FileShare, fingerprint, probeVideo, formatSize } from './share.js';
 import { Call } from './call.js';
-
-const $ = (s) => document.querySelector(s);
-const store = {
-  get(k, d = null) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
-};
-function el(tag, attrs = {}, ...children) {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (v == null || v === false) continue;
-    if (k === 'class') node.className = v;
-    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
-    else node.setAttribute(k, v === true ? '' : v);
-  }
-  node.append(...children.filter((c) => c != null));
-  return node;
-}
+import { $, el, store, colorOf, toast } from './ui.js';
+import { initSocial } from './social.js';
+import { initAdding, handleShareLanding } from './adding.js';
 
 const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
 const WORDS_A = ['maple', 'velvet', 'quiet', 'amber', 'cozy', 'late', 'lucky', 'sunny', 'hazel', 'cobalt'];
@@ -47,7 +33,11 @@ function show(id) {
 
 let roomId = null;
 const routeMatch = location.pathname.match(/^\/r\/([a-z0-9-]{3,40})\/?$/i);
-if (routeMatch) {
+// Lets Android show Couchline in the share sheet once it's on the home screen.
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+if (handleShareLanding()) {
+  // On its way to the last room, carrying what was shared.
+} else if (routeMatch) {
   roomId = routeMatch[1].toLowerCase();
   $('#entryRoom').textContent = roomId;
   for (const id of ['#roomCodeTop', '#roomMenuCode', '#emptyCode']) $(id).textContent = roomId;
@@ -55,6 +45,10 @@ if (routeMatch) {
   $('#optRemote').checked = store.get('remote', false);
   show('entry');
   $('#name').focus();
+  // Arriving from the share sheet with a name already saved: go straight in.
+  if (store.get('pendingAdd')?.link && store.get('name')) {
+    queueMicrotask(() => enterRoom({ name: store.get('name'), call: false, remote: store.get('remote', false) }));
+  }
 } else {
   show('landing');
 }
@@ -112,7 +106,7 @@ const inBox = (it) => IN_BOX.includes(it?.kind);
 const isLive = (it) => !!it?.live || (!!it && player?.key === it.id && player.live);
 
 // ---------- room ----------
-let socket, clock, call, share;
+let socket, clock, call, share, social, adding;
 let room = null;
 let me = { remote: false };
 let lastItemId = null;
@@ -130,6 +124,7 @@ let cdRaf = null;
 function enterRoom(opts) {
   store.set('name', opts.name);
   store.set('remote', opts.remote);
+  store.set('lastRoom', roomId); // where the phone share sheet sends things
   me.remote = opts.remote;
   document.body.classList.toggle('is-remote', me.remote);
   show('room');
@@ -139,6 +134,7 @@ function enterRoom(opts) {
   call = new Call({ socket, selfId: clientId, tilesEl: $('#tiles') });
   share = new FileShare({ socket, onChange: renderLocal, onNotice: shareNotice });
   const restored = share.restore(); // copies downloaded before a reload
+  social = initSocial({ socket, clientId, getRoom: () => room, expectedNow, durationNow, isLive, thumbUrl });
   if (opts.call) startCall(); // inside the tap, so iOS allows camera and audio
 
   socket.on('connect', () => {
@@ -150,6 +146,9 @@ function enterRoom(opts) {
       setTwitchParents(res?.twitchParent);
       if (res?.iceServers) share.iceServers = res.iceServers;
       restored.then(() => share.announce());
+      social.onJoin(res.chat);
+      adding ||= initAdding({ socket, roomId, config: { youtubeSearch: !!res.youtubeSearch } });
+      adding.flushShared();
       await clock.calibrate();
       if (call.active) socket.emit('call:state', { inCall: true });
     });
@@ -158,6 +157,9 @@ function enterRoom(opts) {
   socket.on('state', onState);
   socket.on('toast', toast);
   socket.on('react', floatReaction);
+  socket.on('chat', (m) => { social.onChat(m); saveCache(); });
+  socket.on('typing', (t) => social.onTyping(t));
+  socket.on('ping', (p) => social.onPing(p));
   socket.on('go', onGo);
   // The call and file sharing use the same relay; file messages are marked "share".
   socket.on('signal', (d) => (d.msg?.share ? share.handleSignal(d) : call.handleSignal(d)));
@@ -166,20 +168,26 @@ function enterRoom(opts) {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { wakeLock = null; tick(); } });
 }
 
+// A saved copy of the room, so it comes back if the server restarts.
+function saveCache() {
+  if (!room) return;
+  store.set(`room:${roomId}`, { current: room.current, queue: room.queue, played: room.played, shows: room.shows, history: room.history, chat: social.messages().slice(-100) });
+}
+
 function onState(s) {
   room = s;
-  store.set(`room:${roomId}`, { current: s.current, queue: s.queue, shows: s.shows });
+  saveCache();
   renderRoster();
   renderStage();
   renderQueue();
   renderShows();
   renderLocal();
+  social.onState(s);
   call.sync(s.members);
   tick();
 }
 
 const self = () => room?.members.find((m) => m.id === clientId);
-const colorOf = (c) => (c ? `var(--${c})` : 'var(--muted)');
 
 function renderRoster() {
   const ul = $('#roster');
@@ -188,6 +196,7 @@ function renderRoster() {
     el('span', { class: 'who' }, m.name),
     m.remote ? el('span', { class: 'tag' }, 'remote') : null,
     m.ext ? el('span', { class: 'tag' }, 'extension') : null,
+    m.away ? el('span', { class: 'tag' }, 'away') : null,
   )));
 }
 
@@ -200,6 +209,7 @@ function epLabel(it) {
 
 // A picture for the item, where the source gives one without an account.
 function thumbUrl(it, size = 'mq') {
+  if (it.poster) return it.poster;
   if (it.kind === 'youtube') return `https://i.ytimg.com/vi/${it.videoId}/${size}default.jpg`;
   if (it.kind === 'vimeo') return it.thumb || null;
   if (it.kind === 'twitch' && it.live) return `https://static-cdn.jtvnw.net/previews-ttv/live_user_${it.channel}-640x360.jpg`;
@@ -225,6 +235,12 @@ function renderStage() {
   $('#controls').hidden = !syncedNow();
   $('#controls').classList.toggle('is-live', isLive(cur));
   $('#startBar').hidden = !(kind === 'instagram' || kind === 'stream') || !!room.countdown;
+  // Following someone's Instagram takes over the stage until it stops.
+  const following = !!room.follow;
+  stage.classList.toggle('is-following', following);
+  if (following) {
+    for (const id of ['#emptyStage', '#playerWrap', '#remotePoster', '#igWrap', '#streamCard', '#controls', '#startBar']) $(id).hidden = true;
+  }
 
   if ((cur?.id ?? null) !== lastItemId) {
     lastItemId = cur?.id ?? null;
@@ -251,6 +267,8 @@ function renderStage() {
     $('#streamService').textContent = cur.service && cur.service !== 'Other' ? cur.service : 'On your own screen';
     $('#streamTitle').textContent = cur.title;
     $('#streamEp').textContent = epLabel(cur);
+    $('#streamPoster').hidden = !cur.poster;
+    if (cur.poster) $('#streamPoster').src = cur.poster;
     renderExtNote(cur);
     open.hidden = !cur.url;
     if (cur.url) { open.href = inviteLink(cur.url); open.textContent = `Open ${cur.service || 'link'}`; }
@@ -351,6 +369,7 @@ const roomIsPlaying = () => room.playback.playing && !waitingForLaunch();
 function tick() {
   if (!room) return;
   updateControls();
+  social?.tick();
   const cur = room.current;
   renderPlayerNote();
   if (!cur || !inBox(cur) || me.remote || !player?.ready || player.key !== cur.id) {
@@ -520,6 +539,7 @@ const seekBy = (delta) => {
 
 $('#playBtn').addEventListener('click', togglePlay);
 $('#tapShield').addEventListener('click', () => {
+  if (social?.tookTap()) return; // that was a press-and-hold ping, not a tap
   if (tapNeeded) player?.play(); // the one tap an iPhone needs before a video can play
   else togglePlay();
 });
@@ -592,6 +612,24 @@ function renderQueue() {
     ));
   });
   if (!rows.length) rows.push(el('li', { class: 'q-empty' }, 'Up next is empty. Add the first thing to watch.'));
+  // Everything that was on stays here, newest first, so you can go back to it.
+  if (room.played?.length) {
+    rows.push(el('li', { class: 'q-section' },
+      el('span', {}, 'Played'),
+      el('button', { class: 'btn btn-quiet btn-small', onclick: () => socket.emit('played:clear') }, 'Clear')));
+    for (const it of room.played) {
+      rows.push(el('li', { class: 'q-item is-played' },
+        thumbFor(it),
+        el('div', { class: 'q-text' },
+          el('p', { class: 'q-title' }, it.title),
+          el('p', { class: 'q-sub' }, `${kindLabel(it)}${it.kind === 'local' && !share?.has(it.fp) ? '. Pick or get the file again to play it' : ''}`)),
+        el('div', { class: 'q-actions' },
+          el('button', { class: 'btn btn-small', onclick: () => socket.emit('played:again', { id: it.id, now: true }) }, 'Play again'),
+          el('button', { class: 'btn btn-quiet btn-small', onclick: () => socket.emit('played:again', { id: it.id, now: false }) }, 'Add back'),
+          el('button', { class: 'btn btn-quiet btn-small', 'aria-label': `Remove ${it.title} from Played`, onclick: () => socket.emit('played:remove', { id: it.id }) }, 'Remove')),
+      ));
+    }
+  }
   ol.replaceChildren(...rows);
 }
 
@@ -624,10 +662,18 @@ $('#sourceChips').append(...SOURCES.map((src) => el('button', {
 
 $('#showAddForm').addEventListener('submit', (e) => {
   e.preventDefault();
-  const input = $('#showAddName').value.trim();
-  if (!input) return;
-  socket.emit('queue:add', { input, service: $('#showAddService').value, asName: true }, (res) => {
-    if (!res?.error) $('#showAddName').value = '';
+  const name = $('#showAddName').value.trim();
+  if (!name) return;
+  // A show picked from the search carries its poster and the chosen episode.
+  const picked = adding?.typedShow(name);
+  const input = picked?.season ? `${name} S${picked.season} E${picked.episode}` : name;
+  socket.emit('queue:add', {
+    input, service: $('#showAddService').value, asName: true,
+    poster: picked?.poster, season: picked?.season, episode: picked?.episode,
+  }, (res) => {
+    if (res?.error) return toast({ text: res.error });
+    $('#showAddName').value = '';
+    adding?.resetTypedShow();
   });
 });
 
@@ -781,7 +827,8 @@ function renderShows() {
     ul.replaceChildren(el('li', { class: 'q-empty' }, 'No shows yet. Add one you’re watching together.'));
     return;
   }
-  ul.replaceChildren(...room.shows.map((s) => el('li', { class: 'show' },
+  ul.replaceChildren(...room.shows.map((s) => el('li', { class: s.poster ? 'show has-poster' : 'show' },
+    s.poster ? el('img', { class: 'show-poster', src: s.poster, alt: '', loading: 'lazy' }) : null,
     el('div', { class: 'show-head' },
       el('p', { class: 'show-title' }, s.title),
       el('p', { class: 'show-service' }, s.service === 'Other' ? 'Own screen' : s.service)),
@@ -799,6 +846,7 @@ $('#showForm').addEventListener('submit', (e) => {
   socket.emit('show:add', {
     title: $('#showTitle').value, service: $('#showService').value,
     season: $('#showSeason').value, episode: $('#showEpisode').value,
+    poster: adding?.showExtras().poster,
   });
   $('#showTitle').value = '';
   $('#showSeason').value = '1';
@@ -876,6 +924,7 @@ async function renderDevices() {
     sel.replaceChildren(...list.map((d, i) => el('option', { value: d.deviceId, selected: d.deviceId === current }, d.label || `${fallback} ${i + 1}`)));
     sel.disabled = !list.length;
   };
+  $('#optMirror').checked = call.mirror;
   fill($('#camSelect'), cameras, chosen.camera, 'Camera');
   fill($('#micSelect'), mics, chosen.mic, 'Microphone');
   fill($('#speakerSelect'), speakers, chosen.speaker, 'Speaker');
@@ -892,6 +941,7 @@ $('#devicesBtn').addEventListener('click', () => {
   if (open) renderDevices();
 });
 navigator.mediaDevices?.addEventListener?.('devicechange', () => { if (!$('#devicePanel').hidden) renderDevices(); });
+$('#optMirror').addEventListener('change', (e) => call.setMirror(e.target.checked));
 for (const [sel, kind] of [['#camSelect', 'camera'], ['#micSelect', 'mic'], ['#speakerSelect', 'speaker']]) {
   $(sel).addEventListener('change', async (e) => {
     const ok = await call.useDevice(kind, e.target.value);
@@ -925,23 +975,25 @@ $('#reactions').append(...REACTIONS.map((emoji) => el('button', {
   class: 'react-btn', 'aria-label': `React ${emoji}`, onclick: () => socket?.emit('react', { emoji }),
 }, emoji)));
 
-function floatReaction({ emoji, color }) {
+function floatReaction({ emoji, color, jinx }) {
   const layer = $('#reactLayer');
-  const node = el('span', { class: 'float' }, emoji);
-  node.style.left = `${10 + Math.random() * 75}%`;
-  node.style.setProperty('--c', colorOf(color));
-  layer.append(node);
-  setTimeout(() => node.remove(), 2400);
+  const count = jinx ? 10 : 1;
+  for (let i = 0; i < count; i++) {
+    const node = el('span', { class: jinx ? 'float big' : 'float' }, emoji);
+    node.style.left = `${5 + Math.random() * 85}%`;
+    node.style.animationDelay = `${i * 70}ms`;
+    node.style.setProperty('--c', colorOf(color));
+    layer.append(node);
+    setTimeout(() => node.remove(), 2400 + i * 70);
+  }
+  if (jinx) {
+    const word = el('span', { class: 'jinx-word' }, 'Jinx!');
+    layer.append(word);
+    setTimeout(() => word.remove(), 1700);
+    navigator.vibrate?.([30, 40, 30]);
+  }
 }
 
-function toast({ text, color }) {
-  const box = $('#toasts');
-  const node = el('p', { class: 'toast' }, text);
-  node.style.setProperty('--c', colorOf(color));
-  box.append(node);
-  while (box.children.length > 2) box.firstChild.remove();
-  setTimeout(() => node.remove(), 3200);
-}
 
 $('#share').addEventListener('click', async () => {
   const url = `${location.origin}/r/${roomId}`;

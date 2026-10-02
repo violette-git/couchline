@@ -24,6 +24,15 @@ Chrome and Edge 111 or newer.
 - `sidebar/` is an extension page. It joins the room on the Couchline server as its own seat (tagged "extension" in the web app's roster), runs the call with the web app's `call.js`, and sends reactions, which float over the video.
 - `lib/` holds copies of `public/call.js`, `public/sync.js`, `public/styles.css`, and the Socket.IO client, made by `scripts/build-extension.js`, because Manifest V3 doesn't allow loading code from elsewhere.
 
+## Everywhere else
+
+- **Couchline button** on YouTube, Vimeo, Twitch, and Instagram: Play now or Add to Up next, for whatever you're looking at. It goes to the room you last joined (or the one set in the toolbar popup).
+- **Right-click menu:** "Add to Couchline" and "Play now on Couchline" on any link or page. A check mark (or "!") on the toolbar button says how it went.
+- **Instagram, Share my scrolling:** as you move through reels, everyone in the room sees the same one in Couchline. Stop sharing from the same button; it also stops if you close the tab, and after 30 minutes without moving.
+- **Sidebar chat** on Netflix and Hulu, with messages floating over the video while the sidebar is closed, and **Watch this together** to put the title you're on in front of everyone.
+
+These use the Couchline server's HTTP API (`/api/drop`, `/api/follow`). The room code is the only key, the same as joining by link.
+
 ## Known limits
 
 - Netflix's player API is undocumented. If Netflix changes it, play and pause fall back to the video element and seeking stops (never risking the M7375 crash), and the extension needs an update.

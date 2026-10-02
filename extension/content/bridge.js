@@ -211,6 +211,22 @@
     setTimeout(() => node.remove(), 2400);
   }
 
+  // Chat messages float over the video while the sidebar is closed, or in full screen.
+  function floatMessage({ name, color, text }) {
+    if (!layer || (open && !document.fullscreenElement)) return;
+    let box = layer.querySelector('.chat-float');
+    if (!box) { box = document.createElement('div'); box.className = 'chat-float'; layer.append(box); }
+    const node = document.createElement('p');
+    node.className = 'float-msg';
+    if (color) node.dataset.color = color;
+    const who = document.createElement('strong');
+    who.textContent = name;
+    node.append(who, ` ${text.length > 140 ? `${text.slice(0, 140)}...` : text}`);
+    box.append(node);
+    while (box.children.length > 3) box.firstChild.remove();
+    setTimeout(() => node.remove(), 7000);
+  }
+
   // ---------- sidebar frame ----------
   let host = null;
   let frame = null;
@@ -273,7 +289,7 @@
   }
 
   function sendPage() {
-    try { port?.postMessage({ t: 'page', service: SERVICE, watchId: watchId(), onWatch: onWatchPage() }); } catch { /* reloading */ }
+    try { port?.postMessage({ t: 'page', service: SERVICE, watchId: watchId(), onWatch: onWatchPage(), url: onWatchPage() ? `${location.origin}${location.pathname}` : null }); } catch { /* reloading */ }
   }
 
   function onSidebarMessage(msg) {
@@ -283,6 +299,8 @@
       refreshVisibility();
     } else if (msg.t === 'react') {
       floatReaction(msg);
+    } else if (msg.t === 'chat') {
+      floatMessage(msg);
     } else if (msg.t === 'panel') {
       setOpen(msg.open);
     } else if (msg.t === 'syncToMe' && video) {

@@ -31,4 +31,8 @@ body.side { padding: 0; min-height: 100vh; }
 .side-room .tiles { grid-template-columns: 1fr 1fr; }
 .side-devices { margin: 0; grid-template-columns: 1fr; }
 .side-leave { justify-self: start; }
+.side-chat { display: grid; gap: 0.4rem; }
+.side-chat-list { max-height: 14rem; }
+.side-chat-form { display: flex; gap: 0.4rem; }
+.side-chat-form input { min-height: 38px; padding: 0.4rem 0.7rem; }
 .side-room .toasts { width: calc(100% - 1.5rem); }

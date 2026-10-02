@@ -51,6 +51,7 @@
       <div class="side-actions">
         <button id="startTogether" class="btn btn-primary btn-small" hidden>Start together</button>
         <button id="syncToMe" class="btn btn-small" hidden>Bring everyone to my spot</button>
+        <button id="watchThis" class="btn btn-small" hidden>Watch this together</button>
       </div>
       <div id="countdown" class="side-countdown" hidden aria-live="assertive">
         <span id="countNum" class="count-num"></span>
@@ -60,6 +61,16 @@
     </div>
 
     <div class="reactions side-reactions" id="reactions" aria-label="Send a reaction"></div>
+
+    <section class="side-chat" aria-label="Chat">
+      <ol id="chatList" class="chat-list side-chat-list"></ol>
+      <p id="typingNote" class="note typing" hidden></p>
+      <form id="chatForm" class="side-chat-form">
+        <label for="chatInput" class="sr">Message</label>
+        <input id="chatInput" placeholder="Say something" maxlength="500" autocomplete="off" enterkeyhint="send">
+        <button class="btn btn-small">Send</button>
+      </form>
+    </section>
 
     <section class="call" aria-label="Video call">
       <div id="tiles" class="tiles" title="Tap someone to make them bigger. Double tap for full screen."></div>
@@ -74,7 +85,8 @@
         <label class="field">Camera <select id="camSelect"></select></label>
         <label class="field">Microphone <select id="micSelect"></select></label>
         <label class="field" id="speakerField">Speaker <select id="speakerSelect"></select></label>
-        <p id="deviceNote" class="note"></p>
+        <label class="check"><input type="checkbox" id="optMirror" checked> <span>Mirror my video <small>Only on your screen. Everyone else sees you the right way round.</small></span></label>
+          <p id="deviceNote" class="note"></p>
       </div>
     </section>
 

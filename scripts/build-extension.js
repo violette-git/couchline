@@ -16,6 +16,7 @@ const FILES = [
   { from: 'public/call.js', to: 'extension/lib/call.js', header: notice('public/call.js') },
   { from: 'public/sync.js', to: 'extension/lib/sync.js', header: notice('public/sync.js') },
   { from: 'public/styles.css', to: 'extension/lib/styles.css', header: notice('public/styles.css', true) },
+  { from: 'public/media.js', to: 'extension/lib/media.js', header: notice('public/media.js') },
   { from: 'node_modules/socket.io/client-dist/socket.io.min.js', to: 'extension/lib/socket.io.min.js' },
   { from: 'public/icon-192.png', to: 'extension/icons/icon-192.png' },
 ];

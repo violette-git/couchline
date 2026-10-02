@@ -102,7 +102,8 @@ $('#joinForm').addEventListener('submit', (e) => {
   if (!opts.server) return showJoinError('That Couchline address doesn’t look right.');
   if (opts.roomId.length < 3) return showJoinError('Type the room code, like cozy-lamp-1234.');
   if (!opts.name) return showJoinError('Add your name.');
-  chrome.storage.local.set({ server: opts.server, name: opts.name, withCall: opts.withCall });
+  // The room is remembered too, so "Add to Couchline" on other sites goes here.
+  chrome.storage.local.set({ server: opts.server, name: opts.name, withCall: opts.withCall, room: opts.roomId });
   join(opts);
 });
 
@@ -120,6 +121,7 @@ function join(opts) {
       if (res?.error) { leave(); showJoinError(res.error); return; }
       joinedOnce = true;
       if (res?.iceServers) call.iceServers = res.iceServers;
+      renderChat(res.chat || []);
       await clock.calibrate();
       pushState();
       if (call.active) socket.emit('call:state', { inCall: true });
@@ -133,7 +135,9 @@ function join(opts) {
   socket.on('toast', showToast);
   socket.on('react', (r) => toPage({ t: 'react', ...r }));
   socket.on('go', onGo);
-  socket.on('signal', (d) => call.handleSignal(d));
+  socket.on('signal', (d) => { if (!d.msg?.share) call.handleSignal(d); });
+  socket.on('chat', (m) => { addMessage(m); if (m.from !== clientId) toPage({ t: 'chat', name: m.name, color: m.color, text: m.text }); });
+  socket.on('typing', ({ id, name, on }) => { if (on) typing.set(id, { name, until: Date.now() + 4000 }); else typing.delete(id); renderTyping(); });
 
   $('#roomCode').textContent = opts.roomId;
   $('#joinView').hidden = true;
@@ -212,9 +216,57 @@ function renderStatus() {
   }
   $('#startTogether').hidden = !showStart || !!room.countdown;
   $('#syncToMe').hidden = !showSyncToMe;
+  // This tab is on a title the room isn't watching: one tap puts it on for everyone.
+  const roomWatch = (cur?.url?.match(/\/watch\/([\w-]+)/) || [])[1];
+  $('#watchThis').hidden = !(page.onWatch && page.url && page.watchId && page.watchId !== roomWatch);
 }
 
 $('#startTogether').addEventListener('click', () => toPage({ t: 'startTogether' }));
+// Puts the title this tab is on in front of everyone.
+$('#watchThis').addEventListener('click', () => {
+  if (page.url) socket?.emit('queue:add', { input: page.url, playNow: true }, (r) => { if (r?.error) showToast({ text: r.error }); });
+});
+
+// ---------- chat ----------
+const typing = new Map();
+function chatNode(m) {
+  return el('li', { class: `chat-msg${m.from === clientId ? ' is-me' : ''}`, 'data-color': m.color },
+    el('p', { class: 'chat-meta' }, el('span', { class: 'chat-name' }, m.name)),
+    el('p', { class: 'chat-text' }, m.text));
+}
+function renderChat(list) {
+  $('#chatList').replaceChildren(...list.slice(-100).map(chatNode));
+  $('#chatList').scrollTop = $('#chatList').scrollHeight;
+}
+function addMessage(m) {
+  $('#chatList').append(chatNode(m));
+  while ($('#chatList').children.length > 100) $('#chatList').firstChild.remove();
+  $('#chatList').scrollTop = $('#chatList').scrollHeight;
+  typing.delete(m.from);
+  renderTyping();
+}
+function renderTyping() {
+  const now = Date.now();
+  for (const [id, t] of typing) if (t.until < now) typing.delete(id);
+  const names = [...typing.values()].map((t) => t.name);
+  $('#typingNote').textContent = names.length ? `${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} typing` : '';
+  $('#typingNote').hidden = !names.length;
+}
+setInterval(renderTyping, 1000);
+let typingSent = 0;
+$('#chatInput').addEventListener('input', (e) => {
+  if (!e.target.value.trim() || Date.now() - typingSent < 2000) return;
+  typingSent = Date.now();
+  socket?.emit('chat:typing', { on: true });
+});
+$('#chatForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = $('#chatInput').value.trim();
+  if (!text || !socket) return;
+  socket.emit('chat:send', { text }, () => {});
+  $('#chatInput').value = '';
+  typingSent = 0;
+});
 $('#syncToMe').addEventListener('click', () => toPage({ t: 'syncToMe' }));
 $('#cancelCountdown').addEventListener('click', () => socket?.emit('countdown:cancel'));
 
@@ -287,6 +339,7 @@ async function renderDevices() {
     sel.replaceChildren(...list.map((d, i) => el('option', { value: d.deviceId, selected: d.deviceId === current }, d.label || `${fallback} ${i + 1}`)));
     sel.disabled = !list.length;
   };
+  $('#optMirror').checked = call.mirror;
   fill($('#camSelect'), cameras, chosen.camera, 'Camera');
   fill($('#micSelect'), mics, chosen.mic, 'Microphone');
   fill($('#speakerSelect'), speakers, chosen.speaker, 'Speaker');
@@ -299,6 +352,7 @@ $('#devicesBtn').addEventListener('click', () => {
   $('#devicesBtn').setAttribute('aria-expanded', String(open));
   if (open) renderDevices();
 });
+$('#optMirror').addEventListener('change', (e) => call?.setMirror(e.target.checked));
 for (const [sel, kind] of [['#camSelect', 'camera'], ['#micSelect', 'mic'], ['#speakerSelect', 'speaker']]) {
   $(sel).addEventListener('change', async (e) => {
     if (!(await call?.useDevice(kind, e.target.value))) showToast({ text: 'That device couldn’t be used. It may be busy in another app.' });

@@ -13,6 +13,37 @@ Watch together from two places, on computers and phones (and a TV browser if you
 | Instagram reels | Shown in the room. A shared countdown tells you both when to tap play. |
 | Netflix and Hulu | On computers with the Couchline extension (in `extension/`), play, pause, and seek are synced automatically, and when the episode rolls on, the room rolls on too. Without it, each of you watches on your own account and a shared countdown tells you when to press play. The Shows tab keeps your place in a series. |
 
+## Adding things without copying links
+
+- **Paste button:** copies are one tap. Coming back to Couchline with a link copied, it offers "Add the link you copied?" (where the browser already allows reading the clipboard).
+- **Links in chat:** paste a link in the chat and everyone gets Add to Up next and Play now on it.
+- **Phones:** on Android, add Couchline to the home screen, then Share from Instagram, YouTube, or any app and pick Couchline. On iPhone, make a Shortcut that receives URLs from the Share Sheet and opens `https://your-couchline/share?url=` followed by the Shortcut Input (the room menu has the address and these steps). Shares go to the last room you were in.
+- **Computers:** the extension puts a Couchline button on YouTube, Vimeo, Twitch, and Instagram (Play now, or Add to Up next), adds "Add to Couchline" and "Play now on Couchline" to the right-click menu on any link, and adds the current page from the toolbar popup.
+- **Shows:** type a show name and pick it from the search (with its poster), then pick the episode from the list. Show search by TVmaze.
+- **YouTube search:** type words instead of a link to search YouTube, once the server has a `YOUTUBE_API_KEY` (below).
+- **QR code:** the room menu shows one, for joining from a phone or TV browser.
+
+### Turn on YouTube search
+
+1. Go to https://console.cloud.google.com, make a project, and enable "YouTube Data API v3".
+2. Under Credentials, create an API key. Restrict it to the YouTube Data API v3.
+3. `heroku config:set YOUTUBE_API_KEY=your-key`
+
+The free quota allows about 100 searches a day; results are cached for 10 minutes.
+
+## Together
+
+- **Chat:** a Chat tab with a box right under the video, typing indicators, and an unread count. Messages float over the video when the chat isn't open, and in full screen. A message sent mid-video has an "at 12:03" link that takes everyone back there.
+- **Point:** press and hold on the video to ping that spot on everyone's screen, in your color.
+- **Moments:** the star button marks a moment on everyone's timeline. Tap a mark to go there; right click to remove it.
+- **Ready check:** everyone taps I'm ready, and when the last person does, the countdown starts by itself.
+- **Rate it together:** when something you watched ends, you each rate it; the scores reveal at the same time and go into the Watched tab.
+- **Played:** everything that was on stays at the bottom of Up next, newest first, with Play again and Add back. Files from your device too.
+- **Jinx:** send the same reaction at the same moment and it bursts.
+- **Stepped away:** the roster shows who has switched away from Couchline. Turn on "Pause when someone steps away" in the room menu to pause after 8 seconds.
+- **Instagram follow:** on a computer with the extension, tap Share my scrolling on Instagram, and as you move from reel to reel, the room sees the same one in Couchline (on any device). Phones can't run extensions, so from a phone, share reels one at a time with the share sheet.
+- **Your camera:** your own picture is mirrored like a mirror (only on your screen). Turn it off under Camera and mic.
+
 Up next has three ways to add something (paste a link, pick a file, type a show), and every source is listed under the link box with how to get its link.
 
 The room code is in the top bar: tap it to copy the code or link, join another room, or leave. The empty room shows the code big, and the home page has a box to type one (or paste a whole room link).

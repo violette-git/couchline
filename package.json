@@ -8,12 +8,15 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "build:ext": "node scripts/build-extension.js",
-    "test": "node scripts/build-extension.js --check && node test/media.js && node test/rules.js && node test/smoke.js && node test/sources.js && node test/extension.js"
+    "test": "node scripts/build-extension.js --check && node test/media.js && node test/rules.js && node test/smoke.js && node test/sources.js && node test/extension.js && node test/social.js"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "express": "^4.21.2",
     "hls.js": "^1.7.3",
+    "qrcode-generator": "^1.5.2",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {

@@ -35,6 +35,7 @@
           </div>
         </form>
       </div>
+      <p id="shareNote" class="share-note" hidden role="status"></p>
     </div>
   </main>
 
@@ -71,6 +72,15 @@
             <input id="switchCode" placeholder="Join another room" autocomplete="off" autocapitalize="off" spellcheck="false">
             <button class="btn btn-small">Join</button>
           </form>
+          <div id="qrBox" class="qr-box" hidden aria-label="Scan to join this room"></div>
+          <label class="check"><input type="checkbox" id="optAwayPause"> <span>Pause when someone steps away <small>If someone leaves Couchline for 8 seconds while it’s playing.</small></span></label>
+          <details class="tip">
+            <summary>Add things from your phone’s apps</summary>
+            <p><strong>Android:</strong> add Couchline to your home screen (menu, then Install). Then Share from Instagram, YouTube, or anywhere, and pick Couchline. It goes to the last room you were in.</p>
+            <p><strong>iPhone:</strong> in the Shortcuts app, make a shortcut that receives URLs from the Share Sheet and opens this address followed by the Shortcut Input. Name it Couchline, and it shows up when you tap Share.</p>
+            <p class="shortcut-row"><code id="shortcutUrl"></code> <button id="copyShortcut" class="btn btn-small" type="button">Copy</button></p>
+            <p><strong>Computer:</strong> the Couchline extension adds an “Add to Couchline” button on YouTube, Vimeo, Twitch, and Instagram, and to the right-click menu on links.</p>
+          </details>
           <a href="/" class="btn btn-quiet btn-small">Leave room</a>
         </div>
       </div>
@@ -112,7 +122,17 @@
             <iframe id="igFrame" title="Instagram video" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
           </div>
 
+          <div id="followWrap" class="ig-wrap follow-wrap" hidden>
+            <p class="follow-banner">
+              <span id="followWho"></span>
+              <a id="followOpen" class="btn btn-small" target="_blank" rel="noopener">Open in Instagram</a>
+              <button id="followStop" class="btn btn-quiet btn-small">Stop</button>
+            </p>
+            <iframe id="followFrame" title="The Instagram post being shared" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+          </div>
+
           <div id="streamCard" class="stream-card" hidden>
+            <img id="streamPoster" class="stream-poster" alt="" hidden>
             <p id="streamService" class="stream-service"></p>
             <h2 id="streamTitle" class="stream-title"></h2>
             <p id="streamEp" class="stream-ep"></p>
@@ -127,7 +147,11 @@
           </div>
           <div id="goFlash" class="go-flash" hidden aria-live="assertive"></div>
           <div id="reactLayer" class="react-layer" aria-hidden="true"></div>
+          <div id="pingLayer" class="ping-layer" aria-hidden="true"></div>
+          <div id="chatFloat" class="chat-float" aria-hidden="true"></div>
         </div>
+
+        <section id="rateCard" class="rate-card" hidden aria-live="polite"></section>
 
         <div id="controls" class="controls" hidden>
           <button id="playBtn" class="ctl ctl-play" aria-label="Play">
@@ -136,12 +160,21 @@
           </button>
           <button id="back10" class="ctl seekable" aria-label="Back 10 seconds">-10</button>
           <button id="fwd10" class="ctl seekable" aria-label="Forward 10 seconds">+10</button>
+          <button id="starBtn" class="ctl seekable" aria-label="Star this moment" title="Star this moment. It shows on everyone’s timeline.">★</button>
           <span class="readout">
             <span id="time" class="time">0:00</span>
             <span id="syncPill" class="sync-pill">In sync</span>
           </span>
           <button id="skipBtn" class="ctl ctl-text">Skip</button>
-          <input type="range" id="scrub" class="scrub seekable" min="0" max="1" step="0.1" value="0" aria-label="Seek">
+          <div class="scrub-wrap seekable">
+            <input type="range" id="scrub" class="scrub" min="0" max="1" step="0.1" value="0" aria-label="Seek">
+            <div id="momentMarks" class="moment-marks"></div>
+          </div>
+        </div>
+
+        <div id="readyRow" class="ready-row" hidden>
+          <button id="readyBtn" class="btn btn-small">I’m ready</button>
+          <span id="readyNote" class="note"></span>
         </div>
 
         <div id="startBar" class="start-bar" hidden>
@@ -151,6 +184,13 @@
         </div>
 
         <div class="reactions" id="reactions" aria-label="Send a reaction"></div>
+
+        <form id="quickChat" class="quick-chat">
+          <label for="quickInput" class="sr">Message the room</label>
+          <input id="quickInput" placeholder="Say something" maxlength="500" autocomplete="off" enterkeyhint="send">
+          <button class="btn btn-small">Send</button>
+        </form>
+        <p id="typingQuick" class="note typing quick-typing" hidden></p>
 
         <div class="call-bar">
           <div class="call-buttons">
@@ -174,6 +214,7 @@
           <label class="field">Camera <select id="camSelect"></select></label>
           <label class="field">Microphone <select id="micSelect"></select></label>
           <label class="field" id="speakerField">Speaker <select id="speakerSelect"></select></label>
+          <label class="check"><input type="checkbox" id="optMirror" checked> <span>Mirror my video <small>Only on your screen. Everyone else sees you the right way round.</small></span></label>
           <p id="deviceNote" class="note"></p>
         </div>
 
@@ -185,7 +226,24 @@
       <aside class="panel">
         <div class="tabs" role="tablist">
           <button role="tab" id="tabNextBtn" aria-selected="true" aria-controls="tabNext">Up next</button>
+          <button role="tab" id="tabChatBtn" aria-selected="false" aria-controls="tabChat">Chat <span id="chatBadge" class="badge" hidden></span></button>
           <button role="tab" id="tabShowsBtn" aria-selected="false" aria-controls="tabShows">Shows</button>
+          <button role="tab" id="tabWatchedBtn" aria-selected="false" aria-controls="tabWatched">Watched</button>
+        </div>
+
+        <div id="tabChat" class="tab chat-tab" role="tabpanel" aria-labelledby="tabChatBtn" hidden>
+          <ol id="chatList" class="chat-list"></ol>
+          <p id="typingNote" class="note typing" hidden></p>
+          <form id="chatForm" class="add-form">
+            <label for="chatInput" class="sr">Message</label>
+            <input id="chatInput" placeholder="Message, or paste a link to share" maxlength="500" autocomplete="off" enterkeyhint="send">
+            <button class="btn btn-primary">Send</button>
+          </form>
+        </div>
+
+        <div id="tabWatched" class="tab" role="tabpanel" aria-labelledby="tabWatchedBtn" hidden>
+          <p class="hint">What you finished together, and how you each rated it.</p>
+          <ol id="historyList" class="queue"></ol>
         </div>
 
         <div id="tabNext" class="tab" role="tabpanel" aria-labelledby="tabNextBtn">
@@ -196,13 +254,16 @@
           </div>
 
           <div id="modeLink" class="add-mode" role="tabpanel" aria-labelledby="modeLinkBtn">
-            <form id="addForm" class="add-form">
+            <div id="clipSuggest" class="clip-suggest" hidden role="status"></div>
+            <form id="addForm" class="add-form add-form-paste">
               <label for="addInput" class="sr">Link</label>
               <input id="addInput" placeholder="Paste a link" autocomplete="off" enterkeyhint="done">
               <label for="addService" class="sr">Service</label>
               <select id="addService" hidden><option>Netflix</option><option>Hulu</option><option>Other</option></select>
+              <button type="button" id="pasteBtn" class="btn" title="Add the link you copied">Paste</button>
               <button class="btn btn-primary">Add</button>
             </form>
+            <ol id="searchResults" class="queue search-results" hidden></ol>
             <div id="sourceChips" class="source-chips" aria-label="Where links can come from"></div>
             <p id="sourceHelp" class="note" hidden></p>
             <p id="addError" class="error" hidden></p>
@@ -220,22 +281,27 @@
           <div id="modeShow" class="add-mode" role="tabpanel" aria-labelledby="modeShowBtn" hidden>
             <form id="showAddForm" class="add-form">
               <label for="showAddName" class="sr">Show or movie name</label>
-              <input id="showAddName" placeholder="Severance S2 E3" autocomplete="off" maxlength="120" required>
+              <input id="showAddName" placeholder="Start typing a show" autocomplete="off" maxlength="120" required>
               <label for="showAddService" class="sr">Service</label>
               <select id="showAddService"><option>Netflix</option><option>Hulu</option><option>Other</option></select>
               <button class="btn btn-primary">Add</button>
             </form>
-            <p class="note">For something each of you opens on your own screen. You’ll start it together with a countdown.</p>
+            <ol id="showAddSuggest" class="suggest" hidden></ol>
+            <label for="showAddEp" class="sr">Episode</label>
+            <select id="showAddEp" hidden></select>
+            <p class="note">For something each of you opens on your own screen. You’ll start it together with a countdown. Show search by <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>.</p>
           </div>
 
           <ol id="queue" class="queue"></ol>
         </div>
 
         <div id="tabShows" class="tab" role="tabpanel" aria-labelledby="tabShowsBtn" hidden>
-          <p class="hint">Keep your shared place in a series, so nobody gets ahead by accident.</p>
+          <p class="hint">Keep your shared place in a series, so nobody gets ahead by accident. Show search by <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>.</p>
           <ul id="shows" class="shows"></ul>
           <form id="showForm" class="show-form">
-            <label class="field">Show <input id="showTitle" maxlength="80" required placeholder="The Bear"></label>
+            <label class="field">Show <input id="showTitle" maxlength="80" required placeholder="Start typing a show" autocomplete="off"></label>
+            <ol id="showSuggest" class="suggest" hidden></ol>
+            <label class="field" for="showEpPick"><span class="sr">Episode</span><select id="showEpPick" hidden></select></label>
             <label class="field">On
               <select id="showService"><option>Netflix</option><option>Hulu</option><option>Other</option></select>
             </label>

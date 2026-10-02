@@ -5,15 +5,35 @@
   <title>Couchline</title>
   <link rel="stylesheet" href="../lib/styles.css">
   <style>
-    body { width: 290px; padding: 1rem; display: grid; gap: 0.75rem; }
+    body { width: 310px; padding: 1rem; display: grid; gap: 0.75rem; }
     .brand { font-size: 1.5rem; }
     p { margin: 0; }
+    form { display: grid; gap: 0.6rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    hr { border: 0; border-top: 1px solid var(--line); width: 100%; margin: 0.2rem 0; }
   </style>
 </head>
 <body>
   <span class="brand">Couchline</span>
-  <p id="message" class="hint">Open a Netflix or Hulu video, then use the Couchline tab on the right edge of the page.</p>
-  <button id="toggle" class="btn btn-primary" hidden>Show the sidebar</button>
+
+  <section id="pageBox" hidden>
+    <p id="pageLabel" class="hint"></p>
+    <div class="row" style="margin-top: 0.5rem">
+      <button id="playPage" class="btn btn-primary btn-small">Play now</button>
+      <button id="addPage" class="btn btn-small">Add to Up next</button>
+    </div>
+  </section>
+  <p id="status" class="hint" role="status"></p>
+  <button id="toggle" class="btn btn-small" hidden>Show the sidebar</button>
+
+  <hr>
+  <form id="roomForm">
+    <p class="hint">Your room, for adding things from any site (right-click a link, or the Couchline button on YouTube, Vimeo, Twitch, and Instagram).</p>
+    <label class="field">Couchline address <input id="server" placeholder="https://couchline.example.com" spellcheck="false" required></label>
+    <label class="field">Room code or link <input id="room" placeholder="cozy-lamp-1234" spellcheck="false" required></label>
+    <label class="field">Your name <input id="name" maxlength="24" required></label>
+    <button class="btn btn-small">Save</button>
+  </form>
   <script src="popup.js"></script>
 </body>
 </html>
