@@ -8,7 +8,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "build:ext": "node scripts/build-extension.js",
-    "test": "node scripts/build-extension.js --check && node test/media.js && node test/rules.js && node test/smoke.js && node test/sources.js && node test/extension.js && node test/social.js"
+    "test": "node scripts/build-extension.js --check && node test/media.js && node test/rules.js && node test/smoke.js && node test/sources.js && node test/extension.js && node test/social.js && node test/rooms.js"
   },
   "engines": {
     "node": ">=18"

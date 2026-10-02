@@ -26,7 +26,7 @@
       <h1 class="marquee">Couch&shy;line</h1>
       <p class="lede">Watch together from different places. YouTube, Vimeo, Twitch, and your own video links stay in sync on their own. Netflix and Hulu sync with the Couchline extension, or start on a shared countdown.</p>
       <div class="landing-actions">
-        <button id="createRoom" class="btn btn-primary btn-big">Start a room</button>
+        <button id="createRoom" class="btn btn-primary btn-big" aria-expanded="false" aria-controls="createForm">Start a room</button>
         <form id="joinCode" class="join-code">
           <label for="code" class="join-label">Have a room code?</label>
           <div class="inline-form">
@@ -34,15 +34,47 @@
             <button class="btn">Join</button>
           </div>
         </form>
+        <a href="/rooms" class="btn btn-big browse-link">Browse public rooms</a>
       </div>
+      <form id="createForm" class="create-form" hidden>
+        <label class="field"><span>Name your room <span class="optional">(optional)</span></span>
+          <input id="createTitle" maxlength="60" placeholder="Friday movie night" autocomplete="off">
+        </label>
+        <div class="field">Who can join
+          <div class="seg seg-wide" role="group" aria-label="Who can join">
+            <button type="button" data-visibility="private" aria-pressed="true">Private</button>
+            <button type="button" data-visibility="public" aria-pressed="false">Public</button>
+          </div>
+          <p id="createWhat" class="note"></p>
+        </div>
+        <button class="btn btn-primary">Create room</button>
+      </form>
       <p id="shareNote" class="share-note" hidden role="status"></p>
       <p class="ext-promo"><a href="/extension">Get the Couchline extension</a> for Chrome or Edge on a computer: Netflix and Hulu in sync, and one-click adding from YouTube, Vimeo, Twitch, and Instagram.</p>
     </div>
   </main>
 
+  <section id="browse" class="view browse" hidden>
+    <header class="topbar">
+      <a href="/" class="brand">Couchline</a>
+      <a href="/" class="btn btn-quiet btn-small">Start a room</a>
+    </header>
+    <main class="browse-main">
+      <h1 class="browse-title">Public rooms</h1>
+      <p class="hint">Rooms people have opened to anyone. Join one and watch along. Private rooms never show up here.</p>
+      <form id="browseForm" class="browse-search" role="search">
+        <label for="browseSearch" class="sr">Search rooms</label>
+        <input id="browseSearch" type="search" placeholder="Search by room name or what’s on" autocomplete="off">
+      </form>
+      <p id="browseStatus" class="note" role="status"></p>
+      <ul id="browseList" class="room-list"></ul>
+    </main>
+  </section>
+
   <section id="entry" class="view entry" hidden>
     <form id="entryForm" class="sheet">
       <p class="sheet-room">Room <strong id="entryRoom"></strong></p>
+      <p id="entryTitle" class="sheet-title" hidden></p>
       <h2>Take a seat</h2>
       <label class="field">Your name
         <input id="name" maxlength="24" required autocomplete="nickname" enterkeyhint="go">
@@ -61,6 +93,18 @@
       <div class="room-wrap">
         <button id="roomChip" class="room-chip" aria-expanded="false" aria-controls="roomMenu">Room <strong id="roomCodeTop"></strong></button>
         <div id="roomMenu" class="room-menu" hidden>
+          <form id="roomSettings" class="room-settings">
+            <label class="room-menu-label" for="roomTitleInput">Room name</label>
+            <div class="room-menu-row">
+              <input id="roomTitleInput" maxlength="60" placeholder="Add a name" autocomplete="off">
+              <button class="btn btn-small" id="roomTitleSave">Save</button>
+            </div>
+            <div class="seg seg-wide" role="group" aria-label="Who can join">
+              <button type="button" data-room-visibility="private" aria-pressed="true">Private</button>
+              <button type="button" data-room-visibility="public" aria-pressed="false">Public</button>
+            </div>
+            <p id="roomPrivacyNote" class="note"></p>
+          </form>
           <p class="room-menu-label">Room code</p>
           <p id="roomMenuCode" class="room-menu-code"></p>
           <p class="hint">Anyone with this code or link can join.</p>

@@ -589,6 +589,38 @@ a.brand:hover { opacity: 0.8; }
 .tile figcaption { position: absolute; left: 0.45rem; bottom: 0.4rem; max-width: calc(100% - 0.9rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 999px; background: rgb(19 26 49 / 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .call-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
+/* ---------- starting and browsing rooms ---------- */
+.create-form { margin-top: 1.25rem; max-width: 26rem; display: grid; gap: 0.9rem; padding: 1.1rem; border: 1px solid var(--line); border-radius: var(--r-large); background: var(--night-2); animation: rise-in 0.35s var(--ease-out, ease-out) backwards; }
+.create-form .optional { color: var(--muted); font-weight: 500; }
+.create-form .btn-primary { justify-self: start; }
+.seg-wide { display: flex; width: 100%; max-width: 20rem; }
+.seg-wide button { flex: 1; min-height: 38px; }
+.seg button:disabled { cursor: default; opacity: 0.8; }
+.browse-link { background: transparent; }
+.sheet-title { margin: -0.4rem 0 0; font-weight: 800; font-size: 1.25rem; font-stretch: 85%; overflow-wrap: anywhere; }
+.room-settings { display: grid; gap: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--line); }
+.room-settings input:disabled { opacity: 0.85; }
+.browse-main { max-width: 52rem; margin: 0 auto; padding: 1rem clamp(1.25rem, 5vw, 2.5rem) 4rem; display: grid; gap: 0.9rem; }
+.browse-title { margin: 0.5rem 0 0; font-size: clamp(2.2rem, 7vw, 3.6rem); font-weight: 800; font-stretch: 75%; line-height: 0.95; letter-spacing: -0.02em; }
+.browse-search input { min-height: 48px; font-size: 1.05rem; }
+.room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.room-card-link { display: grid; grid-template-columns: 128px minmax(0, 1fr) auto; gap: 0.9rem; align-items: center; padding: 0.7rem; border: 1px solid var(--line); border-radius: var(--r-large); background: var(--night-2); color: var(--paper); text-decoration: none; transition: background-color 0.15s, transform 0.15s; }
+.room-card-link:hover { background: var(--night-3); }
+.room-card-thumb { position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-small); overflow: hidden; background: var(--screen); display: grid; place-items: center; color: var(--muted); font-weight: 800; font-stretch: 80%; }
+.room-card-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.room-live { position: absolute; left: 6px; bottom: 6px; padding: 0.05rem 0.45rem; border-radius: 999px; background: var(--paper); color: var(--night); font-size: 0.7rem; font-weight: 800; }
+.room-card-text { min-width: 0; display: grid; gap: 0.15rem; }
+.room-card-text p { margin: 0; }
+.room-card-title { font-weight: 800; font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-card-now, .room-card-people { color: var(--muted); font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-card-people { display: flex; align-items: center; gap: 0.45rem; }
+.room-dots { display: inline-flex; gap: 0.2rem; flex: none; }
+.room-dots .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--c); }
+@media (max-width: 560px) {
+  .room-card-link { grid-template-columns: 96px minmax(0, 1fr); }
+  .room-card-join { display: none; }
+}
+
 /* ---------- swipe together ---------- */
 .stage.is-swiping { aspect-ratio: auto; height: min(84svh, 760px); }
 .swipe-wrap { position: absolute; inset: 0; z-index: 4; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--screen); }

@@ -13,6 +13,7 @@ import { Call } from './call.js';
 import { $, el, store, colorOf, toast, listNames } from './ui.js';
 import { initSocial } from './social.js';
 import { initAdding, handleShareLanding } from './adding.js';
+import { initCreate, initBrowse, pendingRoom } from './rooms.js';
 
 const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
 const WORDS_A = ['maple', 'velvet', 'quiet', 'amber', 'cozy', 'late', 'lucky', 'sunny', 'hazel', 'cobalt'];
@@ -40,6 +41,10 @@ const routeMatch = location.pathname.match(/^\/r\/([a-z0-9-]{3,40})\/?$/i);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 if (handleShareLanding()) {
   // On its way to the last room, carrying what was shared.
+} else if (/^\/rooms\/?$/.test(location.pathname)) {
+  show('browse');
+  document.title = 'Public rooms on Couchline';
+  initBrowse();
 } else if (routeMatch) {
   roomId = routeMatch[1].toLowerCase();
   $('#entryRoom').textContent = roomId;
@@ -49,6 +54,15 @@ if (handleShareLanding()) {
   $('#name').value = store.get('name', '');
   $('#optRemote').checked = store.get('remote', false);
   show('entry');
+  // Joining from Browse rooms (or a new room): show its name on the way in.
+  const named = pendingRoom.get(roomId)?.title;
+  if (named) { $('#entryTitle').textContent = named; $('#entryTitle').hidden = false; }
+  else {
+    fetch(`/api/rooms?q=${encodeURIComponent(roomId)}`).then((r) => r.json()).then(({ rooms }) => {
+      const found = rooms?.find((x) => x.id === roomId);
+      if (found?.title) { $('#entryTitle').textContent = found.title; $('#entryTitle').hidden = false; }
+    }).catch(() => {});
+  }
   $('#name').focus();
   // Arriving from the share sheet with a name already saved: go straight in.
   if (store.get('pendingAdd')?.link && store.get('name')) {
@@ -58,7 +72,7 @@ if (handleShareLanding()) {
   show('landing');
 }
 
-$('#createRoom').addEventListener('click', () => { location.href = `/r/${newRoomCode()}`; });
+initCreate({ newRoomCode });
 // Accepts a code ("cozy lamp 1234" works too) or a whole room link.
 function goToRoom(value) {
   const v = value.trim();
@@ -189,7 +203,7 @@ function enterRoom(opts) {
 // A saved copy of the room, so it comes back if the server restarts.
 function saveCache() {
   if (!room) return;
-  store.set(`room:${roomId}`, { current: room.current, queue: room.queue, played: room.played, shows: room.shows, history: room.history, chat: social.messages().slice(-100) });
+  store.set(`room:${roomId}`, { title: room.title, visibility: room.visibility, current: room.current, queue: room.queue, played: room.played, shows: room.shows, history: room.history, chat: social.messages().slice(-100) });
 }
 
 function onState(s) {
@@ -200,6 +214,7 @@ function onState(s) {
   renderQueue();
   renderShows();
   renderLocal();
+  renderRoomSettings();
   social.onState(s);
   swipe.render(s);
   renderCallButtons();
@@ -217,7 +232,47 @@ function renderRoster() {
     m.remote ? el('span', { class: 'tag' }, 'remote') : null,
     m.ext ? el('span', { class: 'tag' }, 'extension') : null,
     m.away ? el('span', { class: 'tag' }, 'away') : null,
+    m.id === room.host ? el('span', { class: 'tag' }, 'host') : null,
   )));
+}
+
+// ---------- the room's name and who can join ----------
+let settingsKey = '';
+function renderRoomSettings() {
+  const isHost = room.host === clientId;
+  const name = room.title || roomId;
+  $('#roomCodeTop').textContent = name;
+  $('#roomChip').classList.toggle('has-title', !!room.title);
+  document.title = room.title ? `${room.title} on Couchline` : 'Couchline';
+  // Only rewrite the name box when the name itself changes, so typing isn't interrupted.
+  const key = `${room.title}|${room.visibility}|${isHost}`;
+  if (key !== settingsKey) {
+    settingsKey = key;
+    if (document.activeElement !== $('#roomTitleInput')) $('#roomTitleInput').value = room.title || '';
+  }
+  $('#roomTitleInput').disabled = !isHost;
+  $('#roomTitleSave').hidden = !isHost;
+  for (const b of document.querySelectorAll('[data-room-visibility]')) {
+    b.setAttribute('aria-pressed', String(b.dataset.roomVisibility === room.visibility));
+    b.disabled = !isHost;
+  }
+  const what = room.visibility === 'public'
+    ? 'Public: listed in Browse rooms while someone is here. Anyone can join.'
+    : 'Private: only people with the code or link can join.';
+  $('#roomPrivacyNote').textContent = isHost ? what : `${what} ${room.hostName || 'The host'} can change this.`;
+  // A room this person just created: put its name and privacy in place.
+  const pending = pendingRoom.get(roomId);
+  if (pending && isHost) {
+    pendingRoom.clear();
+    if (pending.title || pending.visibility === 'public') socket.emit('room:settings', { title: pending.title, visibility: pending.visibility }, () => {});
+  }
+}
+$('#roomSettings').addEventListener('submit', (e) => {
+  e.preventDefault();
+  socket.emit('room:settings', { title: $('#roomTitleInput').value }, (r) => { if (r?.error) toast({ text: r.error }); });
+});
+for (const b of document.querySelectorAll('[data-room-visibility]')) {
+  b.addEventListener('click', () => socket.emit('room:settings', { visibility: b.dataset.roomVisibility }, (r) => { if (r?.error) toast({ text: r.error }); }));
 }
 
 // ---------- stage ----------

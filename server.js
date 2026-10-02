@@ -36,6 +36,7 @@ app.use('/vendor/hls', express.static(path.join(__dirname, 'node_modules', 'hls.
 app.use('/vendor/qrcode', express.static(path.join(__dirname, 'node_modules', 'qrcode-generator')));
 app.get('/config', (_req, res) => res.json({ iceServers: iceServers(), twitchParent: TWITCH_PARENT, youtubeSearch: !!YOUTUBE_API_KEY }));
 app.get('/r/:roomId', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/rooms', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 // The phone share sheet (Android, or an iPhone Shortcut) opens /share?url=..., and the page
 // adds it to the last room this device was in.
 app.get('/share', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
@@ -214,6 +215,9 @@ function getRoom(roomId) {
       settings: { pauseOnAway: false },
       // Reels together: a deck of Instagram reels everyone swipes through as one.
       reels: { on: false, items: [], index: 0, driver: null },
+      // Title and who can find the room. Private rooms are joined by code or link only;
+      // public rooms are listed in the directory while someone is in them.
+      title: null, visibility: 'private', host: null,
     };
     rooms.set(roomId, room);
   }
@@ -262,10 +266,23 @@ function videoSeats(room) {
     .map((m) => m.id));
 }
 
+// The host controls the title and private or public. If the host isn't here, whoever has
+// been in the room longest stands in, so a room never gets stuck.
+function hostOf(room) {
+  if (room.host && room.members.has(room.host)) return room.host;
+  const longest = [...room.members.values()].sort((a, b) => a.joinedAt - b.joinedAt)[0];
+  return longest?.id || null;
+}
+
 function publicState(room) {
   const onVideo = videoSeats(room);
+  const host = hostOf(room);
   return {
     id: room.id,
+    title: room.title,
+    visibility: room.visibility,
+    host,
+    hostName: room.members.get(host)?.name || null,
     current: room.current,
     playback: room.playback,
     extSync: extSynced(room),
@@ -451,7 +468,11 @@ function updateHolds(room) {
   }
 }
 
+const cleanTitle = (t) => str(t, 60).replace(/\s+/g, ' ') || null;
+
 function adoptCache(room, cache) {
+  room.title = cleanTitle(cache.title);
+  room.visibility = cache.visibility === 'public' ? 'public' : 'private';
   const items = Array.isArray(cache.queue) ? cache.queue.slice(0, 100).map(cleanItem).filter(Boolean) : [];
   const shows = Array.isArray(cache.shows) ? cache.shows.slice(0, 50).map(cleanShow).filter(Boolean) : [];
   room.queue = items;
@@ -638,6 +659,28 @@ app.post('/api/follow/stop', (req, res) => {
 });
 // YouTube search, when a key is set. Results are cached briefly to save quota.
 const searchCache = new Map();
+// The public room directory: public rooms with people in them, busiest first. Searches the
+// room's title, what's on, and its code.
+app.get('/api/rooms', (req, res) => {
+  const q = str(req.query.q, 60).toLowerCase();
+  const list = [...rooms.values()]
+    .filter((r) => r.visibility === 'public' && r.members.size)
+    .filter((r) => !q || [r.title, r.current?.title, r.id].some((s) => s && s.toLowerCase().includes(q)))
+    .sort((a, b) => b.members.size - a.members.size || (b.lastActive || 0) - (a.lastActive || 0))
+    .slice(0, 50)
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      people: [...r.members.values()].filter((m) => !m.remote).map((m) => ({ name: m.name, color: m.color })),
+      playing: r.playback.playing && Date.now() >= r.playback.at,
+      now: r.current ? {
+        title: r.current.title, kind: r.current.kind, service: r.current.service || null, videoId: r.current.videoId || null,
+        thumb: r.current.thumb || null, poster: r.current.poster || null, live: !!r.current.live, channel: r.current.channel || null,
+      } : null,
+    }));
+  res.json({ rooms: list });
+});
+
 app.get('/api/search/youtube', async (req, res) => {
   if (!YOUTUBE_API_KEY) return res.status(501).json({ error: 'YouTube search isn’t set up on this server.' });
   const q = str(req.query.q, 100);
@@ -659,6 +702,20 @@ app.get('/api/search/youtube', async (req, res) => {
     res.status(502).json({ error: 'YouTube search didn’t answer. Try again in a moment.' });
   }
 });
+
+// Each address can try this many different rooms in 10 minutes. Plenty for real use; far too
+// few to go looking for private rooms by guessing codes.
+const ROOM_TRIES = 30;
+const roomTries = new Map(); // address -> { since, rooms: Set }
+function tooManyRooms(socket, roomId) {
+  const addr = String(socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || '').split(',')[0].trim();
+  const now = Date.now();
+  let t = roomTries.get(addr);
+  if (!t || now - t.since > 10 * 60 * 1000) { t = { since: now, rooms: new Set() }; roomTries.set(addr, t); }
+  if (roomTries.size > 10000) roomTries.clear();
+  t.rooms.add(roomId);
+  return t.rooms.size > ROOM_TRIES;
+}
 
 // ---------- sockets ----------
 io.on('connection', (socket) => {
@@ -695,23 +752,50 @@ io.on('connection', (socket) => {
     if (room || typeof data !== 'object') return;
     const roomId = str(data.roomId, 40).toLowerCase();
     if (!/^[a-z0-9-]{3,40}$/.test(roomId)) return typeof cb === 'function' && cb({ error: 'That room code is not valid.' });
+    // Private rooms are found only by their code, so trying lots of codes is cut off.
+    if (tooManyRooms(socket, roomId)) return typeof cb === 'function' && cb({ error: 'Too many different rooms tried. Wait a few minutes and try again.' });
     room = getRoom(roomId);
+    const brandNew = room.fresh;
     if (room.fresh && data.cache && typeof data.cache === 'object') adoptCache(room, data.cache);
     room.fresh = false;
     const clientId = str(data.clientId, 40) || newId();
     const previous = room.members.get(clientId);
+    // The first person into a new room (or back into one after a restart) is its host.
+    if (brandNew || !room.host) room.host = clientId;
+    room.lastActive = Date.now();
     me = {
       id: clientId, socketId: socket.id, name: str(data.name, 24) || 'Guest',
       color: previous?.color || pickColor(room), remote: !!data.remote, inCall: false, drift: null,
       // Set when this seat is the Couchline extension running on a Netflix or Hulu page.
       ext: EXT_SERVICES.includes(data.ext) ? data.ext : null,
       files: [], // fingerprints of local video files this seat can play (and share)
+      joinedAt: previous?.joinedAt || Date.now(),
     };
     room.members.set(clientId, me);
     socket.join(roomId);
     if (typeof cb === 'function') cb({ ok: true, clientId, iceServers: iceServers(), twitchParent: TWITCH_PARENT, youtubeSearch: !!YOUTUBE_API_KEY, chat: room.chat.slice(-100) });
     broadcast(room);
     if (!previous) toast(room, `${me.name} joined`, me);
+  });
+
+  // The room's title and private or public. Only the host (or whoever stands in) can change them.
+  on('room:settings', (d, cb) => {
+    if (hostOf(room) !== me.id) return cb({ error: `Only ${room.members.get(hostOf(room))?.name || 'the host'} can change this.` });
+    const changes = [];
+    if ('title' in d) {
+      const title = cleanTitle(d.title);
+      if (title !== room.title) {
+        room.title = title;
+        changes.push(title ? `named the room ${title}` : 'cleared the room name');
+      }
+    }
+    if ('visibility' in d && ['private', 'public'].includes(d.visibility) && d.visibility !== room.visibility) {
+      room.visibility = d.visibility;
+      changes.push(d.visibility === 'public' ? 'made the room public' : 'made the room private');
+    }
+    broadcast(room);
+    if (changes.length) toast(room, `${me.name} ${changes.join(' and ')}`, me);
+    cb({ ok: true });
   });
 
   // A web seat can turn itself into a remote, so it stops counting as a viewer.

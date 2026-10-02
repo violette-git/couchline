@@ -32,7 +32,9 @@ export class TikTokPlayer extends Player {
     this.pendingSeek = 0;
   }
 
-  load(item, start = 0) {
+  load(item, start = 0, retry = false) {
+    if (!retry) this.retried = false;
+    this.item = item;
     this.key = item.id;
     this.ready = false;
     this.error = null;
@@ -82,6 +84,13 @@ export class TikTokPlayer extends Player {
     } else if (d.type === 'onCurrentTime' && d.value) {
       this.s = { ...this.s, seconds: Number(d.value.currentTime) || 0, duration: Number(d.value.duration) || this.s.duration, at: now };
     } else if (d.type === 'onPlayerError') {
+      // TikTok sometimes fails a load for a moment; try once more before giving up.
+      if (!this.retried && this.item) {
+        this.retried = true;
+        const item = this.item;
+        setTimeout(() => { if (this.key === item.id) this.load(item, this.pendingSeek || 0, true); }, 3000);
+        return;
+      }
       this.error = 'This TikTok can’t be played here. It may be private or removed.';
     }
   }
