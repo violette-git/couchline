@@ -14,6 +14,13 @@ Watch together from different places, on computers and phones (and a TV browser 
 | Instagram reels | Shown in the room. A shared countdown tells you both when to tap play. |
 | Netflix and Hulu | On computers with the Couchline extension (in `extension/`), play, pause, and seek are synced automatically, and when the episode rolls on, the room rolls on too. Without it, each of you watches on your own account and a shared countdown tells you when to press play. The Shows tab keeps your place in a series. |
 
+## Rooms: names, private, and public
+
+- **Start a room** asks for an optional name and who can join. **Private** (the default) means only people with the code or link get in, and it never shows up anywhere. **Public** means it's listed in **Browse public rooms** (`/rooms`) while someone is in it, and anyone can join.
+- The person who starts a room is its **host** and changes its name and privacy from the room menu. If the host is away, whoever has been in the room longest stands in; the host gets it back on return.
+- Browse public rooms shows live rooms, busiest first, with what's on and who's there, and searches room names, what's playing, and codes.
+- Trying lots of different room codes from one address is cut off after 30 in 10 minutes, so private rooms can't be found by guessing.
+
 ## Adding things without copying links
 
 - **Paste button:** copies are one tap. Coming back to Couchline with a link copied, it offers "Add the link you copied?" (where the browser already allows reading the clipboard).
