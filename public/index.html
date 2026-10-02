@@ -3,61 +3,295 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1E2742">
+  <meta name="theme-color" content="#0A0B10">
+  <meta name="color-scheme" content="dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Couchline">
   <meta name="description" content="Watch YouTube, Vimeo, Twitch, your own videos, Netflix, and Hulu together, wherever you are.">
-  <title>Couchline</title>
+  <meta property="og:title" content="Couchline: miles apart, same show">
+  <meta property="og:description" content="Watch YouTube, Vimeo, Twitch, TikTok, your own videos, Netflix, and Hulu together, with a video call and chat beside it.">
+  <meta property="og:type" content="website">
+  <title>Couchline: watch together from anywhere</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap">
+  <link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/geist-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 
-  <main id="landing" class="view landing">
-    <div class="landing-inner">
-      <p class="pair" aria-hidden="true"><span class="seat" data-color="lamp"></span><span class="seat" data-color="rose"></span></p>
-      <h1 class="marquee">Couch&shy;line</h1>
-      <p class="lede">Watch together from different places. YouTube, Vimeo, Twitch, and your own video links stay in sync on their own. Netflix and Hulu sync with the Couchline extension, or start on a shared countdown.</p>
-      <div class="landing-actions">
-        <button id="createRoom" class="btn btn-primary btn-big" aria-expanded="false" aria-controls="createForm">Start a room</button>
-        <form id="joinCode" class="join-code">
-          <label for="code" class="join-label">Have a room code?</label>
-          <div class="inline-form">
-            <input id="code" placeholder="cozy-lamp-1234" autocomplete="off" autocapitalize="off" spellcheck="false">
-            <button class="btn">Join</button>
-          </div>
-        </form>
-        <a href="/rooms" class="btn btn-big browse-link">Browse public rooms</a>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="mark" viewBox="0 0 512 512"><rect width="512" height="512" rx="120" fill="#1F232D"/><rect x="96" y="252" width="320" height="112" rx="44" fill="#3A4053"/><circle cx="196" cy="214" r="56" fill="#F5B942"/><circle cx="316" cy="214" r="56" fill="#F48A8F"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4M12 2v13"/></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+      <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+      <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></symbol>
+      <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 21V5M4 5h11l-2 4 2 4H4"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+      <symbol id="i-remote" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3"/><path d="M12 6v4M10 8h4M12 17h.01"/></symbol>
+      <symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M10 3a2 2 0 0 1 4 0v2h4a1 1 0 0 1 1 1v4h-2a2 2 0 0 0 0 4h2v4a1 1 0 0 1-1 1h-4v-2a2 2 0 0 0-4 0v2H6a1 1 0 0 1-1-1v-4h2a2 2 0 0 0 0-4H5V6a1 1 0 0 1 1-1h4z"/></symbol>
+      <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-tv" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    </defs>
+  </svg>
+
+  <div id="landing" class="view landing">
+    <header class="site-nav">
+      <div class="wrap site-nav-inner">
+        <a href="/" class="brand"><svg class="brand-mark" aria-hidden="true"><use href="#mark"/></svg><span>Couchline</span></a>
+        <nav class="site-links" aria-label="Sections">
+          <a href="#watch">What you can watch</a>
+          <a href="#how">How it works</a>
+          <a href="#features">Features</a>
+          <a href="/rooms">Public rooms</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <button type="button" class="btn btn-primary btn-sm" data-open-create>Start a room</button>
       </div>
-      <form id="createForm" class="create-form" hidden>
-        <label class="field"><span>Name your room <span class="optional">(optional)</span></span>
-          <input id="createTitle" maxlength="60" placeholder="Friday movie night" autocomplete="off">
-        </label>
-        <div class="field">Who can join
-          <div class="seg seg-wide" role="group" aria-label="Who can join">
-            <button type="button" data-visibility="private" aria-pressed="true">Private</button>
-            <button type="button" data-visibility="public" aria-pressed="false">Public</button>
+    </header>
+
+    <main>
+      <section class="wrap hero" id="top">
+        <div class="hero-copy">
+          <p class="chip-pair"><span class="pair" aria-hidden="true"><span data-color="lamp"></span><span data-color="rose"></span><span data-color="sky"></span></span>Watch parties for two or twenty</p>
+          <h1 class="hero-title">Miles apart.<br><span>Same show.</span></h1>
+          <p class="hero-lede">Couchline keeps YouTube, Vimeo, Twitch, TikTok, and your own videos in sync on every screen, with a video call and chat right beside them. Netflix and Hulu sync with the Couchline extension, or start on a shared countdown.</p>
+          <div class="hero-actions">
+            <button id="createRoom" class="btn btn-primary btn-lg" aria-expanded="false" aria-controls="createForm">Start a room <svg class="i" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+            <form id="joinCode" class="code-form">
+              <label for="code" class="sr">Have a room code?</label>
+              <input id="code" placeholder="Have a room code?" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go">
+              <button class="btn">Join</button>
+            </form>
           </div>
-          <p id="createWhat" class="note"></p>
+          <form id="createForm" class="create-form" hidden>
+            <label class="field"><span>Name your room <span class="optional">(optional)</span></span>
+              <input id="createTitle" maxlength="60" placeholder="Friday movie night" autocomplete="off">
+            </label>
+            <div class="field">Who can join
+              <div class="seg seg-wide" role="group" aria-label="Who can join">
+                <button type="button" data-visibility="private" aria-pressed="true">Private</button>
+                <button type="button" data-visibility="public" aria-pressed="false">Public</button>
+              </div>
+              <p id="createWhat" class="note"></p>
+            </div>
+            <button class="btn btn-primary">Create room</button>
+          </form>
+          <p id="shareNote" class="share-note" hidden role="status"></p>
+          <ul class="hero-checks">
+            <li><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>No sign-up</li>
+            <li><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Phones, laptops, and TV browsers</li>
+            <li><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Private or public rooms</li>
+          </ul>
+          <p class="hero-links"><a href="/rooms">Browse public rooms <svg class="i" aria-hidden="true"><use href="#i-arrow"/></svg></a></p>
         </div>
-        <button class="btn btn-primary">Create room</button>
-      </form>
-      <p id="shareNote" class="share-note" hidden role="status"></p>
-      <p class="ext-promo"><a href="/extension">Get the Couchline extension</a> for Chrome or Edge on a computer: Netflix and Hulu in sync, and one-click adding from YouTube, Vimeo, Twitch, and Instagram.</p>
-    </div>
-  </main>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="mock-window">
+            <div class="mock-top">
+              <span class="mock-code"><svg><use href="#mark"/></svg>amber-otter-4821</span>
+              <span class="mock-roster"><span data-color="lamp">Mia</span><span data-color="rose">Sam</span><span data-color="sky">Jo</span></span>
+            </div>
+            <div class="scene">
+              <span class="scene-sun"></span><span class="scene-hill a"></span><span class="scene-hill b"></span><span class="scene-ground"></span>
+              <span class="scene-caption"><small>YouTube</small>Dolomites at sunset</span>
+              <span class="scene-react" data-color="rose">😂</span>
+              <span class="scene-react small" data-color="lamp">😍</span>
+              <span class="scene-chat" data-color="sky"><b>Jo</b> wait, rewind that</span>
+            </div>
+            <div class="mock-transport">
+              <span class="mock-scrub"><span></span></span>
+              <span class="mock-row">
+                <span class="mock-play"><svg viewBox="0 0 24 24"><path d="M6 4.5h4v15H6zm8 0h4v15h-4z"/></svg></span>
+                <svg class="i"><use href="#i-back"/></svg><svg class="i"><use href="#i-fwd"/></svg>
+                <span class="mock-time">14:32 <span>/ 38:10</span></span>
+                <span class="pill pill-ok">In sync</span>
+              </span>
+            </div>
+          </div>
+          <div class="mock-tiles">
+            <span class="mock-tile" data-color="lamp"><b>M</b><i>Mia</i></span>
+            <span class="mock-tile" data-color="rose"><b>S</b><i>Sam</i></span>
+          </div>
+          <div class="mock-phone">
+            <div>
+              <small>Netflix · S2 E4</small>
+              <strong data-color="rose">3</strong>
+              <span>Sam started the countdown</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="watch" class="band">
+        <div class="wrap">
+          <p class="eyebrow">What you can watch</p>
+          <h2 class="section-title">Works with what you already watch.</h2>
+          <p class="section-lede">Most things play right inside Couchline and stay locked in sync. For apps no website can control, the extension or a shared countdown starts everyone together.</p>
+          <div class="cards">
+            <article class="card">
+              <div class="card-head"><h3>YouTube, Vimeo, Twitch</h3><span class="pill pill-ok">Auto sync</span></div>
+              <p>Play, pause, and seeking are shared, and every screen stays within about half a second. Live Twitch channels share play and pause.</p>
+              <div class="card-demo demo-sync" aria-hidden="true">
+                <span data-color="lamp"><b>Mia</b><i><em></em></i><code>23:41</code></span>
+                <span data-color="rose"><b>Sam</b><i><em></em></i><code>23:41</code></span>
+              </div>
+            </article>
+            <article class="card">
+              <div class="card-head"><h3>Your own videos</h3><span class="pill pill-ok">Auto sync</span></div>
+              <p>Pick a file from your device, or paste a video, Jellyfin, or Plex link. Files play from your device and go browser to browser, so nothing is uploaded.</p>
+              <div class="card-demo demo-link" aria-hidden="true"><span class="icon-tile"><svg class="i"><use href="#i-link"/></svg></span><code>movie-night.mp4</code></div>
+            </article>
+            <article class="card">
+              <div class="card-head"><h3>Netflix and Hulu</h3><span class="pill">Extension</span></div>
+              <p>On a computer with the Couchline extension, play, pause, and seek sync on their own. Without it, a shared countdown tells everyone when to press play.</p>
+              <div class="card-demo demo-count" aria-hidden="true"><span>3</span><span>2</span><span class="on">1</span><b>Press play</b></div>
+            </article>
+            <article class="card">
+              <div class="card-head"><h3>Reels and TikToks</h3><span class="pill">Swipe together</span></div>
+              <p>Build a deck of Instagram reels and TikToks and swipe through it as one. Whoever swipes is driving, and every screen follows.</p>
+              <div class="card-demo demo-link" aria-hidden="true"><span class="icon-tile"><svg class="i"><use href="#i-phone"/></svg></span><code>instagram.com/reel/…</code></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="how" class="band band-alt">
+        <div class="wrap">
+          <p class="eyebrow">How it works</p>
+          <h2 class="section-title">Three steps to the same second.</h2>
+          <ol class="cards how-steps">
+            <li class="card">
+              <span class="how-num">01</span>
+              <h3>Start a room</h3>
+              <p>Name it if you like, and choose private or public. You get a room code that’s easy to say out loud.</p>
+              <span class="how-demo mono">amber-otter-4821</span>
+            </li>
+            <li class="card">
+              <span class="how-num">02</span>
+              <h3>Send the link</h3>
+              <p>Friends open it on any device and pick a name. No account, no download. A QR code works for TV browsers.</p>
+              <span class="how-demo how-demo-btn"><svg class="i" aria-hidden="true"><use href="#i-share"/></svg>Invite</span>
+            </li>
+            <li class="card">
+              <span class="how-num">03</span>
+              <h3>Press play</h3>
+              <p>Pause, seek, skip, or react. Every screen follows, and the call and chat stay right beside the video.</p>
+              <span class="pill pill-ok pill-lg">In sync</span>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="features" class="band">
+        <div class="wrap">
+          <p class="eyebrow">Features</p>
+          <h2 class="section-title">Everything movie night needs. Nothing it doesn’t.</h2>
+          <div class="features">
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-video"/></svg></span><h3>Video call built in</h3><p>Up to five cameras beside, under, or over the video. Pop it out to keep faces on screen while you use another app.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg></span><h3>Chat that rides along</h3><p>Messages float over the video. Anything sent mid-show links back to that exact moment.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-smile"/></svg></span><h3>Reactions and pings</h3><p>Send a reaction, or press and hold the video to point at something, in your own color.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-list"/></svg></span><h3>Shared Up next</h3><p>Paste a link, pick a file, or type a show. Anyone can add, reorder, or skip.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-flag"/></svg></span><h3>Ready check</h3><p>Everyone taps I’m ready, and the countdown starts on its own when the last person does.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-star"/></svg></span><h3>Rate it together</h3><p>When it ends, you each rate it. Scores reveal at the same moment and go into Watched.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-globe"/></svg></span><h3>Private or public</h3><p>Keep a room to people with the link, or list it in Public rooms so anyone can join.</p></div>
+            <div class="feature"><span class="icon-tile"><svg class="i" aria-hidden="true"><use href="#i-remote"/></svg></span><h3>Phone as a remote</h3><p>Play on a TV browser and control everything from the phone in your hand.</p></div>
+          </div>
+
+          <div class="ext-band">
+            <span class="icon-tile icon-tile-lg"><svg class="i" aria-hidden="true"><use href="#i-puzzle"/></svg></span>
+            <div class="ext-band-text">
+              <h3>The Couchline extension</h3>
+              <p>For Chrome and Edge on a computer. Netflix and Hulu stay in sync on their own, and YouTube, Vimeo, Twitch, and Instagram get a one-click Add to Couchline button.</p>
+            </div>
+            <a class="btn btn-primary" href="/extension">Get the extension</a>
+          </div>
+
+          <div class="tips">
+            <h3>Before you press play</h3>
+            <div class="tips-grid">
+              <p><svg class="i" aria-hidden="true"><use href="#i-headphones"/></svg><span><strong>Wear headphones.</strong> Otherwise the call mic picks up the show.</span></p>
+              <p><svg class="i" aria-hidden="true"><use href="#i-phone"/></svg><span><strong>On iPhone, tap the first video once.</strong> After that it syncs on its own.</span></p>
+              <p><svg class="i" aria-hidden="true"><use href="#i-tv"/></svg><span><strong>Netflix or Hulu without the extension:</strong> open the episode, pause at the start, then tap Start together.</span></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" class="band band-alt">
+        <div class="wrap faq">
+          <div>
+            <p class="eyebrow">FAQ</p>
+            <h2 class="section-title">Good questions.</h2>
+          </div>
+          <div class="faq-list">
+            <details open>
+              <summary>Does it work with Netflix and Hulu?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>Yes. On a computer with the Couchline extension, play, pause, and seek sync on their own, and the room rolls on with the next episode. On phones, each of you plays on your own account and a shared countdown starts you together. The Shows tab remembers where you are in a series.</p>
+            </details>
+            <details>
+              <summary>Do we need accounts?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>No. Start a room, send the link, and each person picks a name. Your queue, chat, and shows are saved in your browser.</p>
+            </details>
+            <details>
+              <summary>How many people can watch?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>Rooms have no size limit. The video call shows up to five cameras, and everyone past that joins with audio.</p>
+            </details>
+            <details>
+              <summary>Who can join my room?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>Private rooms (the default) are only for people with the code or link, and never show up anywhere. Public rooms are listed in Public rooms while someone is in them, and anyone can join.</p>
+            </details>
+            <details>
+              <summary>What happens with YouTube ads?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>Ads play separately for each person. Couchline catches whoever watched an ad back up afterward. YouTube Premium skips them entirely.</p>
+            </details>
+            <details>
+              <summary>Will the call work on cell data?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>Usually. Some cell and work networks block direct calls; adding a relay server on the host fixes that. Watching works either way.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="band final">
+        <div class="wrap final-inner">
+          <span class="pair pair-lg" aria-hidden="true"><span data-color="lamp"></span><span data-color="rose"></span><span data-color="sky"></span></span>
+          <h2>Save them a seat.</h2>
+          <p>Start a room and send the link. Joining takes one tap.</p>
+          <button type="button" class="btn btn-primary btn-lg" data-open-create>Start a room <svg class="i" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap site-footer-inner">
+        <span class="brand brand-sm"><svg class="brand-mark" aria-hidden="true"><use href="#mark"/></svg><span>Couchline</span><small>Watch together from anywhere.</small></span>
+        <nav class="footer-links" aria-label="More">
+          <a href="/rooms">Public rooms</a>
+          <a href="/extension">Extension</a>
+          <span>Sync and call adapted from <a href="https://github.com/howardchung/watchparty" rel="noopener">WatchParty</a> (MIT)</span>
+        </nav>
+      </div>
+    </footer>
+  </div>
 
   <section id="browse" class="view browse" hidden>
     <header class="topbar">
-      <a href="/" class="brand">Couchline</a>
-      <a href="/" class="btn btn-quiet btn-small">Start a room</a>
+      <a href="/" class="brand"><svg class="brand-mark" aria-hidden="true"><use href="#mark"/></svg><span>Couchline</span></a>
+      <a href="/" class="btn btn-primary btn-small">Start a room</a>
     </header>
     <main class="browse-main">
       <h1 class="browse-title">Public rooms</h1>
@@ -72,6 +306,7 @@
   </section>
 
   <section id="entry" class="view entry" hidden>
+    <header class="entry-top"><a href="/" class="brand"><svg class="brand-mark" aria-hidden="true"><use href="#mark"/></svg><span>Couchline</span></a></header>
     <form id="entryForm" class="sheet">
       <p class="sheet-room">Room <strong id="entryRoom"></strong></p>
       <p id="entryTitle" class="sheet-title" hidden></p>
@@ -79,7 +314,7 @@
       <label class="field">Your name
         <input id="name" maxlength="24" required autocomplete="nickname" enterkeyhint="go">
       </label>
-      <label class="check"><input type="checkbox" id="optCall" checked> <span>Join the video call</span></label>
+      <label class="check"><input type="checkbox" id="optCall" checked> <span>Join the video call <small>Camera and mic, beside the video.</small></span></label>
       <label class="check"><input type="checkbox" id="optRemote"> <span>Use this device as a remote <small>The video plays on another screen, like a TV browser.</small></span></label>
       <p class="hint">Wear headphones so the call doesn’t pick up the show.</p>
       <button class="btn btn-primary btn-big">Enter room</button>
@@ -88,7 +323,7 @@
 
   <section id="room" class="view room" hidden>
     <header class="topbar">
-      <a href="/" class="brand">Couchline</a>
+      <a href="/" class="brand"><svg class="brand-mark" aria-hidden="true"><use href="#mark"/></svg><span>Couchline</span></a>
       <ul id="roster" class="roster" aria-label="In the room"></ul>
       <div class="room-wrap">
         <button id="roomChip" class="room-chip" aria-expanded="false" aria-controls="roomMenu">Room <strong id="roomCodeTop"></strong></button>
@@ -130,7 +365,7 @@
           <a href="/" class="btn btn-quiet btn-small">Leave room</a>
         </div>
       </div>
-      <button id="share" class="btn btn-quiet btn-small">Invite</button>
+      <button id="share" class="btn btn-primary btn-small"><svg class="i" aria-hidden="true"><use href="#i-share"/></svg><span>Invite</span></button>
     </header>
 
     <div class="layout">

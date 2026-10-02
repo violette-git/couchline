@@ -37,3 +37,7 @@ Third-party libraries served or packaged by Couchline keep their own licenses:
 
 Show search uses the TVmaze API (https://www.tvmaze.com/api). TVmaze data is licensed
 CC BY-SA 4.0; Couchline credits TVmaze next to the show search.
+
+## Geist and Geist Mono
+
+The Geist and Geist Mono fonts in `public/fonts/` (copied to `extension/fonts/`) are Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font), licensed under the SIL Open Font License 1.1. See `public/fonts/OFL.txt`.

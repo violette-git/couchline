@@ -33,6 +33,14 @@ export function initCreate({ newRoomCode }) {
     $('#createRoom').setAttribute('aria-expanded', String(!form.hidden));
     if (!form.hidden) $('#createTitle').focus();
   });
+  // The other Start a room buttons on the home page open the same form, up in the hero.
+  for (const b of document.querySelectorAll('[data-open-create]')) {
+    b.addEventListener('click', () => {
+      if (form.hidden) $('#createRoom').click();
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      $('#createTitle').focus({ preventScroll: true });
+    });
+  }
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const code = newRoomCode();
