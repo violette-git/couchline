@@ -61,9 +61,11 @@ export function initSocial({ socket, clientId, getRoom, expectedNow, durationNow
     if (nearBottom || m.from === clientId) list.scrollTop = list.scrollHeight;
     typing.delete(m.from);
     renderTyping();
-    if (m.from === clientId) return;
-    if (!chatOpen()) setUnread(unread + 1);
-    floatMessage(m);
+    // Every message rises over the video, yours included.
+    const launchFrom = m.from === clientId && sentFrom?.text === m.text && Date.now() - sentFrom.at < 5000 ? sentFrom.input : null;
+    if (launchFrom) sentFrom = null;
+    flyMessage(m, launchFrom);
+    if (m.from !== clientId && !chatOpen()) setUnread(unread + 1);
   }
 
   function setUnread(n) {
@@ -72,19 +74,62 @@ export function initSocial({ socket, clientId, getRoom, expectedNow, durationNow
     $('#chatBadge').hidden = !n;
   }
 
-  // Messages float over the video when the chat list isn't in view (and always in full screen).
-  function floatMessage(m) {
-    if (chatOpen() && !document.body.classList.contains('is-full')) return;
-    const box = $('#chatFloat');
-    const node = el('p', { class: 'float-msg', 'data-color': m.color }, el('strong', {}, m.name), ` ${m.text.length > 140 ? `${m.text.slice(0, 140)}...` : m.text}`);
-    box.append(node);
-    while (box.children.length > 3) box.firstChild.remove();
-    setTimeout(() => node.remove(), 7000);
+  // A message lifts off from the box it was typed in, lands at the bottom of the video, and
+  // floats up until it leaves the top of the picture. Messages from others rise from the
+  // bottom of the video. With reduced motion, they fade in and out in place instead.
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let sentFrom = null;
+  function bubble(m) {
+    const text = m.text.length > 160 ? `${m.text.slice(0, 160)}...` : m.text;
+    return el('p', { class: 'fly-msg', 'data-color': m.color }, el('strong', {}, m.name), ` ${text}`);
+  }
+  function flyMessage(m, fromInput) {
+    const stage = $('#stage');
+    const layer = $('#chatFloat');
+    const sr = stage.getBoundingClientRect();
+    if (!sr.height || stage.offsetParent === null) return;
+    const node = bubble(m);
+    layer.append(node);
+    const h = node.offsetHeight;
+    const startBottom = parseFloat(getComputedStyle(node).bottom) || 0;
+    if (reduceMotion.matches) {
+      node.animate([{ opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: 5000, fill: 'forwards' }).finished.then(() => node.remove(), () => node.remove());
+      return;
+    }
+    // Long enough to read: about 4.5 seconds plus a little per character, over the whole height.
+    const travel = sr.height - startBottom + h + 8;
+    const duration = Math.min(10000, 4500 + m.text.length * 30);
+    const rise = () => node.animate(
+      [{ transform: 'translateY(0)', opacity: 1 }, { transform: `translateY(${-travel}px)`, opacity: 1 }],
+      { duration, easing: 'linear', fill: 'forwards' },
+    ).finished.then(() => node.remove(), () => node.remove());
+    const ir = fromInput?.getBoundingClientRect();
+    if (!ir || !ir.width) {
+      node.animate([{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 250, easing: 'ease-out' });
+      rise();
+      return;
+    }
+    // Your own message: a copy flies from the chat box to where the rising one starts.
+    node.style.visibility = 'hidden';
+    const nr = node.getBoundingClientRect();
+    const twin = bubble(m);
+    twin.classList.add('fly-launch');
+    Object.assign(twin.style, { left: `${ir.left}px`, top: `${ir.top + (ir.height - h) / 2}px`, width: `${nr.width}px` });
+    document.body.append(twin);
+    const dx = nr.left - ir.left;
+    const dy = nr.top - (ir.top + (ir.height - h) / 2);
+    twin.animate([{ transform: 'translate(0, 0) scale(0.92)', opacity: 0.4 }, { transform: `translate(${dx}px, ${dy}px) scale(1)`, opacity: 1 }],
+      { duration: 380, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)', fill: 'forwards' }).finished.then(() => {
+      twin.remove();
+      node.style.visibility = '';
+      rise();
+    }, () => twin.remove());
   }
 
   function send(input) {
     const text = input.value.trim();
     if (!text) return;
+    sentFrom = { input, text, at: Date.now() };
     socket.emit('chat:send', { text }, (res) => {
       if (res?.error && res.error !== 'empty') toast({ text: res.error });
     });
@@ -237,21 +282,30 @@ export function initSocial({ socket, clientId, getRoom, expectedNow, durationNow
   }
 
   // ---------- watched together ----------
+  // Everything you actually played together, whatever it was, newest first. Ratings show
+  // once they're revealed.
+  const THUMB_TEXT = { instagram: 'IG', twitch: 'TW', vimeo: 'V', file: 'VIDEO', local: 'FILE', jellyfin: 'JF', plex: 'PLEX' };
   function renderHistory(room) {
     const list = $('#historyList');
     if (!room.history.length) {
-      list.replaceChildren(el('li', { class: 'q-empty' }, 'Nothing yet. When you finish something together, you each rate it and it lands here.'));
+      list.replaceChildren(el('li', { class: 'q-empty' }, 'Nothing yet. Everything you play together shows up here, with how you each rated it.'));
       return;
     }
     list.replaceChildren(...room.history.map((h) => {
       const src = thumbUrl(h);
-      const thumb = el('div', { class: 'thumb' }, src ? el('img', { src, alt: '', loading: 'lazy' }) : (h.service || h.kind || '').slice(0, 4).toUpperCase());
-      return el('li', { class: 'q-item' }, thumb,
+      const label = h.kind === 'stream' ? (h.service && h.service !== 'Other' ? h.service.slice(0, 1) : 'TV') : THUMB_TEXT[h.kind] || '';
+      const thumb = el('div', { class: 'thumb' }, src ? el('img', { src, alt: '', loading: 'lazy' }) : label);
+      const ep = h.season && h.episode ? ` S${h.season} E${h.episode}` : '';
+      const now = room.current?.id === h.id;
+      const when = now ? 'Watching now' : shortDate(h.at);
+      return el('li', { class: now ? 'q-item is-current' : 'q-item' }, thumb,
         el('div', { class: 'q-text' },
-          el('p', { class: 'q-title' }, h.title),
-          el('p', { class: 'q-sub' }, shortDate(h.at)),
-          el('p', { class: 'history-votes' }, ...h.votes.map((v) => el('span', { 'data-color': v.color }, `${v.name} ${'★'.repeat(v.score)}`)))),
-        h.url ? el('div', { class: 'q-actions' }, el('button', { class: 'btn btn-small', onclick: () => add(h.url, false) }, 'Watch again')) : null);
+          el('p', { class: 'q-title' }, `${h.title}${h.title.includes(`S${h.season} E`) ? '' : ep}`),
+          el('p', { class: 'q-sub' }, when),
+          h.votes.length
+            ? el('p', { class: 'history-votes' }, ...h.votes.map((v) => el('span', { 'data-color': v.color, 'aria-label': `${v.name}: ${v.score} out of 5` }, `${v.name} ${'★'.repeat(v.score)}`)))
+            : el('p', { class: 'q-sub' }, now ? '' : 'Not rated')),
+        h.url && !now ? el('div', { class: 'q-actions' }, el('button', { class: 'btn btn-small', onclick: () => add(h.url, false) }, 'Watch again')) : null);
     }));
   }
 

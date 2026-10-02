@@ -77,6 +77,8 @@ check.ok('moments: starred spots shared and removable; chat remembers the spot')
 
 // ---- rate it together ----
 const watched = a.last.current;
+assert.equal(b.last.history[0].id, watched.id, 'what is playing is in Watched right away');
+assert.deepEqual(b.last.history[0].votes, []);
 await a.ask('queue:add', { input: 'https://vimeo.com/1084537' });
 await wait(50);
 a.emit('media:ended', { itemId: watched.id }); await wait(80);
@@ -90,10 +92,14 @@ assert.equal(b.last.rating.revealed, true);
 assert.deepEqual(b.last.rating.votes.map((v) => [v.name, v.score]), [['Ana', 5], ['Ben', 3]]);
 assert.equal(b.last.history[0].title, watched.title);
 assert.equal(b.last.history[0].videoId, watched.videoId);
+assert.equal(b.last.history.filter((h) => h.id === watched.id).length, 1, 'the rating joins the same entry');
+assert.equal(b.last.history[0].votes.length, 2);
 a.emit('rate:dismiss'); await wait(50);
 assert.equal(b.last.rating, null);
 check.ok('rate it together: hidden until both answer, then revealed and saved to history');
 
+// Everything actually played is in Watched as soon as it starts, rated or not.
+assert.ok(b.last.history.some((h) => h.kind === 'vimeo') === false, 'nothing unplayed is listed');
 // Skipping something nobody played doesn't ask for a rating.
 a.emit('queue:skip'); await wait(50);
 assert.equal(b.last.rating, null);
@@ -154,6 +160,18 @@ assert.equal(search.status, 501, 'search is off without a YouTube key');
 const config = await (await fetch(`http://localhost:${PORT}/config`)).json();
 assert.equal(config.youtubeSearch, false);
 check.ok('add from anywhere: drop, play now, unknown rooms and links refused, share page served');
+
+// ---- Watched includes every kind of media ----
+for (const input of ['https://www.instagram.com/reel/C8abcdEFG/', 'https://www.netflix.com/watch/81234567']) {
+  await a.ask('queue:add', { input, playNow: true });
+  await wait(50);
+  a.emit('countdown:start', { seconds: 3 });
+  await new Promise((res) => b.once('go', res));
+  await wait(50);
+}
+const kinds = b.last.history.map((h) => h.kind);
+assert.ok(kinds.includes('instagram') && kinds.includes('stream') && kinds.includes('youtube'), `Watched has every kind: ${kinds}`);
+check.ok('Watched lists everything played, whatever it is, rated or not');
 
 // ---- everything that was on stays in Played ----
 const playedBefore = a.last.played.map((p) => p.kind);

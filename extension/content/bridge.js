@@ -211,20 +211,28 @@
     setTimeout(() => node.remove(), 2400);
   }
 
-  // Chat messages float over the video while the sidebar is closed, or in full screen.
+  // Chat messages rise over the video from the bottom until they leave the top, like in the
+  // web app. With reduced motion they fade in and out in place.
   function floatMessage({ name, color, text }) {
-    if (!layer || (open && !document.fullscreenElement)) return;
+    if (!layer) return;
     let box = layer.querySelector('.chat-float');
     if (!box) { box = document.createElement('div'); box.className = 'chat-float'; layer.append(box); }
     const node = document.createElement('p');
-    node.className = 'float-msg';
+    node.className = 'fly-msg';
     if (color) node.dataset.color = color;
     const who = document.createElement('strong');
     who.textContent = name;
-    node.append(who, ` ${text.length > 140 ? `${text.slice(0, 140)}...` : text}`);
+    node.append(who, ` ${text.length > 160 ? `${text.slice(0, 160)}...` : text}`);
+    node.style.bottom = '6.5rem';
     box.append(node);
-    while (box.children.length > 3) box.firstChild.remove();
-    setTimeout(() => node.remove(), 7000);
+    const done = () => node.remove();
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      node.animate([{ opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: 5000, fill: 'forwards' }).finished.then(done, done);
+      return;
+    }
+    const travel = box.getBoundingClientRect().height + node.offsetHeight;
+    node.animate([{ transform: 'translateY(0)' }, { transform: `translateY(${-travel}px)` }],
+      { duration: Math.min(10000, 5000 + text.length * 30), easing: 'linear', fill: 'forwards' }).finished.then(done, done);
   }
 
   // ---------- sidebar frame ----------

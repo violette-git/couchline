@@ -181,7 +181,7 @@ const posNow = (room) => {
 const setPlayback = (room, playing, position, at = Date.now(), fresh = false) => {
   room.playback = { playing, position: Math.max(0, position), at, fresh };
   // Played for real (not just scheduled by a countdown), so it gets a rating when it ends.
-  if (playing && room.current && at <= Date.now()) room.current.watched = true;
+  if (playing && room.current && at <= Date.now()) markWatched(room, room.current);
 };
 
 const inBox = (room) => IN_BOX.includes(room.current?.kind);
@@ -219,7 +219,7 @@ function publicState(room) {
     moments: room.moments,
     ready: room.ready,
     rating: publicRating(room.rating),
-    history: room.history.slice(0, 30),
+    history: room.history,
     follow: room.follow,
     settings: room.settings,
     serverNow: Date.now(),
@@ -276,7 +276,7 @@ const PLAYED_MAX = 50;
 const sameThing = (a, b) => a.kind === b.kind && (a.fp || a.url || a.title) === (b.fp || b.url || b.title) && a.episode === b.episode && a.season === b.season;
 function archive(room, item) {
   if (!item) return;
-  const { watched, ...kept } = item;
+  const { watched: _watched, ...kept } = item;
   room.played = [kept, ...room.played.filter((p) => p.id !== item.id && !sameThing(p, item))].slice(0, PLAYED_MAX);
 }
 
@@ -306,7 +306,9 @@ function startCountdown(room, seconds, by, from = null) {
   room.countdownTimer = setTimeout(() => {
     room.countdownTimer = null;
     room.countdown = null;
-    if (room.current?.id === itemId && room.playback.playing) room.current.watched = true;
+    // Synced items start playing now; countdown items (Netflix or Hulu without the extension,
+    // Instagram) are started by each person at this moment. Either way, it's being watched.
+    if (room.current?.id === itemId) markWatched(room, room.current);
     broadcast(room);
     io.to(room.id).emit('go', { itemId });
   }, seconds * 1000);
@@ -327,16 +329,24 @@ function keepPlaying(room, playing = true) {
 }
 
 // When something everyone actually watched ends, everyone rates it; scores reveal together.
+// What the Watched list and ratings keep about an item.
+const snapshot = (item) => ({
+  id: item.id, title: item.title, kind: item.kind, videoId: item.videoId || null, thumb: item.thumb || null, poster: item.poster || null,
+  service: item.service || null, live: !!item.live, channel: item.channel || null, url: item.kind === 'local' ? null : item.url || null,
+  season: item.season || null, episode: item.episode || null, igType: item.igType || null, code: item.code || null,
+});
+// Anything actually played goes into Watched right away, whatever it is; ratings join it later.
+function markWatched(room, item) {
+  item.watched = true;
+  if (room.history.some((h) => h.id === item.id)) return;
+  room.history.unshift({ ...snapshot(item), at: Date.now(), votes: [] });
+  room.history = room.history.slice(0, 50);
+}
+
 function startRating(room, item) {
   if (!item?.watched) return;
   clearTimeout(room.ratingTimer);
-  room.rating = {
-    itemId: item.id, votes: {}, revealed: false,
-    item: {
-      id: item.id, title: item.title, kind: item.kind, videoId: item.videoId || null, thumb: item.thumb || null, poster: item.poster || null,
-      service: item.service || null, live: !!item.live, channel: item.channel || null, url: item.kind === 'local' ? null : item.url || null,
-    },
-  };
+  room.rating = { itemId: item.id, votes: {}, revealed: false, item: snapshot(item) };
   room.ratingTimer = setTimeout(() => revealRating(room), RATING_TIMEOUT_MS);
 }
 function revealRating(room) {
@@ -345,7 +355,9 @@ function revealRating(room) {
   clearTimeout(room.ratingTimer);
   r.revealed = true;
   const scores = Object.values(r.votes).filter((v) => v.score);
-  if (scores.length) room.history.unshift({ ...r.item, at: Date.now(), votes: scores });
+  const entry = room.history.find((h) => h.id === r.itemId);
+  if (entry) entry.votes = scores;
+  else room.history.unshift({ ...r.item, at: Date.now(), votes: scores });
   room.history = room.history.slice(0, 50);
   broadcast(room);
 }
@@ -406,6 +418,8 @@ function cleanHistory(h) {
     live: !!h.live, channel: str(h.channel, 25) || null, at: num(h.at, 0, 1e15, Date.now()), votes,
     poster: POSTER.test(str(h.poster, 300)) ? str(h.poster, 300) : null,
     url: h.url && parseMedia(h.url)?.url ? parseMedia(h.url).url : null,
+    season: h.season ? num(h.season, 0, 99, null) : null, episode: h.episode ? num(h.episode, 0, 999, null) : null,
+    igType: h.igType === 'p' ? 'p' : h.igType === 'reel' ? 'reel' : null, code: /^[\w-]{5,40}$/.test(h.code || '') ? h.code : null,
   };
 }
 

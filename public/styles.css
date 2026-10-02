@@ -261,6 +261,9 @@ input::placeholder { color: #7883A6; }
 .is-full .topbar, .is-full .panel, .is-full .start-bar:empty { display: none; }
 .is-full .layout { padding: 0; grid-template-columns: minmax(0, 1fr); }
 .is-full .main { min-height: 100svh; align-content: start; }
+.is-full .quick-chat { position: fixed; z-index: 8; left: calc(0.75rem + env(safe-area-inset-left)); bottom: calc(7.5rem + 0.75rem); width: min(26rem, 62vw); padding: 0; }
+.is-full .quick-chat input { background: rgb(19 26 49 / 0.78); backdrop-filter: blur(6px); }
+.is-full .quick-typing { position: fixed; z-index: 8; left: 1rem; bottom: calc(7.5rem + 3.6rem); margin: 0; padding: 0; }
 .is-full #fullBtn { position: fixed; top: calc(0.75rem + env(safe-area-inset-top)); left: calc(0.75rem + env(safe-area-inset-left)); z-index: 8; background: rgb(19 26 49 / 0.8); }
 .is-full .stage, .is-full .stage[data-kind] { height: calc(100svh - 7.5rem); aspect-ratio: auto; min-height: 0; border-radius: 0; }
 .is-full:not([data-call-layout="half"]) .main > .call { position: fixed; top: calc(0.75rem + env(safe-area-inset-top)); right: calc(0.75rem + env(safe-area-inset-right)); width: clamp(140px, 18vw, 260px); padding: 0; z-index: 7; }
@@ -310,10 +313,12 @@ input::placeholder { color: #7883A6; }
 .quick-chat input { min-height: 40px; padding: 0.45rem 0.8rem; }
 .quick-typing { padding: 0 1rem; margin-top: -0.4rem; }
 
-/* Messages over the video, in the sender's color. */
-.chat-float { position: absolute; left: 0.75rem; bottom: 4.5rem; z-index: 5; display: grid; gap: 0.35rem; max-width: min(70%, 26rem); pointer-events: none; }
-.float-msg { margin: 0; padding: 0.4rem 0.7rem; border-radius: var(--r-small); background: rgb(19 26 49 / 0.82); border-left: 3px solid var(--c, var(--line)); font-size: 0.92rem; animation: msg-in 0.25s ease-out; }
-.float-msg strong { color: var(--c, var(--paper)); }
+/* Messages rise over the video, in the sender's color, until they leave the top. */
+.chat-float { position: absolute; inset: 0; z-index: 5; overflow: hidden; pointer-events: none; }
+.fly-msg { position: absolute; left: 0.75rem; bottom: 0.75rem; margin: 0; max-width: min(72%, 28rem); padding: 0.45rem 0.75rem; border-radius: var(--r-small); background: rgb(19 26 49 / 0.84); border-left: 3px solid var(--c, var(--line)); font-size: 0.95rem; line-height: 1.35; overflow-wrap: anywhere; box-shadow: 0 6px 18px rgb(8 12 26 / 0.35); will-change: transform; }
+.fly-msg strong { color: var(--c, var(--paper)); margin-right: 0.15rem; }
+.fly-launch { position: fixed; z-index: 40; pointer-events: none; }
+.is-full .fly-msg { bottom: 4.25rem; font-size: 1.05rem; }
 @keyframes msg-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* ---------- pings, moments, ready, rating ---------- */

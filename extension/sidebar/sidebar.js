@@ -136,7 +136,7 @@ function join(opts) {
   socket.on('react', (r) => toPage({ t: 'react', ...r }));
   socket.on('go', onGo);
   socket.on('signal', (d) => { if (!d.msg?.share) call.handleSignal(d); });
-  socket.on('chat', (m) => { addMessage(m); if (m.from !== clientId) toPage({ t: 'chat', name: m.name, color: m.color, text: m.text }); });
+  socket.on('chat', (m) => { addMessage(m); toPage({ t: 'chat', name: m.name, color: m.color, text: m.text }); });
   socket.on('typing', ({ id, name, on }) => { if (on) typing.set(id, { name, until: Date.now() + 4000 }); else typing.delete(id); renderTyping(); });
 
   $('#roomCode').textContent = opts.roomId;
