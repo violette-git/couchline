@@ -31,6 +31,12 @@ export function toast({ text, color }) {
   setTimeout(() => node.remove(), 3200);
 }
 
+// "Ana", "Ana and Ben", "Ana, Ben, and Cy".
+export function listNames(names) {
+  if (names.length < 3) return names.join(' and ');
+  return `${names.slice(0, -1).join(', ')}, and ${names.at(-1)}`;
+}
+
 export function debounce(fn, ms) {
   let t = null;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };

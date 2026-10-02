@@ -1,7 +1,7 @@
 {
   "name": "Couchline",
   "short_name": "Couchline",
-  "description": "Watch YouTube, Instagram, Netflix, and Hulu together from two places.",
+  "description": "Watch YouTube, Vimeo, Twitch, your own videos, Instagram, Netflix, and Hulu together, wherever you are.",
   "start_url": "/",
   "share_target": {
     "action": "/share",

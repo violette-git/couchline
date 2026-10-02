@@ -13,7 +13,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 const ROOM_TTL_MS = 12 * 60 * 60 * 1000; // empty rooms are kept 12 hours
 const HOLD_LIMIT_MS = 20000; // stop waiting on a buffering viewer after 20s
-const MEMBER_COLORS = ['lamp', 'rose', 'sky', 'mint'];
+const MEMBER_COLORS = ['lamp', 'rose', 'sky', 'mint', 'lilac', 'lime', 'orchid', 'iris'];
+// Every person in the call connects to every other, so cameras are capped. The first five
+// people with a camera are on video; anyone past that is on audio until a spot opens.
+const VIDEO_SLOTS = 5;
 const SERVICES = ['Netflix', 'Hulu', 'Other'];
 const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
 // Twitch only plays inside pages on the domains listed here (comma separated, no scheme or port).
@@ -202,7 +205,17 @@ function isWatching(room, m) {
   return extSynced(room);
 }
 
+// Camera spots go to people with a camera, in the order they joined the call.
+function videoSeats(room) {
+  return new Set([...room.members.values()]
+    .filter((m) => m.inCall && m.cam)
+    .sort((a, b) => a.callSince - b.callSince)
+    .slice(0, VIDEO_SLOTS)
+    .map((m) => m.id));
+}
+
 function publicState(room) {
+  const onVideo = videoSeats(room);
   return {
     id: room.id,
     current: room.current,
@@ -214,6 +227,8 @@ function publicState(room) {
     countdown: room.countdown,
     members: [...room.members.values()].map((m) => ({
       id: m.id, name: m.name, color: m.color, remote: m.remote, ext: m.ext, inCall: m.inCall, drift: m.drift, files: m.files, away: m.away,
+      video: m.inCall ? onVideo.has(m.id) : null,
+      camOn: m.inCall ? !!m.live : null,
     })),
     holds: [...room.holds.keys()].map((cid) => room.members.get(cid)?.name).filter(Boolean),
     moments: room.moments,
@@ -558,13 +573,20 @@ io.on('connection', (socket) => {
   let me = null;
   let bucket = { count: 0, since: Date.now() };
 
-  const limited = () => {
+  // Call and file-sharing setup messages come in bursts (several per person in the call),
+  // so they get their own, larger allowance; everything else shares the smaller one.
+  let signalBucket = { count: 0, since: Date.now() };
+  const limited = (event) => {
     const now = Date.now();
+    if (event === 'signal') {
+      if (now - signalBucket.since > 1000) signalBucket = { count: 0, since: now };
+      return ++signalBucket.count > 400;
+    }
     if (now - bucket.since > 1000) bucket = { count: 0, since: now };
     return ++bucket.count > 40;
   };
   const on = (event, fn) => socket.on(event, (data, cb) => {
-    if (!room || !me || limited()) return;
+    if (!room || !me || limited(event)) return;
     try {
       fn(data || {}, typeof cb === 'function' ? cb : () => {});
     } catch (err) {
@@ -934,7 +956,17 @@ io.on('connection', (socket) => {
     broadcast(room);
   });
   on('call:state', (d) => {
+    const joining = !!d.inCall && !me.inCall;
     me.inCall = !!d.inCall;
+    me.cam = me.inCall && d.cam !== false; // has (or wants) a camera
+    me.live = me.inCall && !!d.live; // the camera is actually on
+    if (joining) {
+      // A quick reconnect (a network blip) keeps its place in line for a camera spot.
+      const kept = room.callPlaces?.get(me.id);
+      me.callSince = kept && Date.now() - kept.left < 2 * 60 * 1000 ? kept.since : Date.now();
+      room.callPlaces?.delete(me.id);
+    }
+    if (!me.inCall) me.callSince = null;
     broadcast(room);
   });
   // WebRTC signaling relay, keyed by client id (pattern from WatchParty's sendSignal).
@@ -948,6 +980,7 @@ io.on('connection', (socket) => {
     if (!room || !me || room.members.get(me.id)?.socketId !== socket.id) return;
     const wasWatching = isWatching(room, me);
     clearTimeout(me.awayTimer);
+    if (me.inCall && me.callSince) (room.callPlaces ||= new Map()).set(me.id, { since: me.callSince, left: Date.now() });
     room.members.delete(me.id);
     maybeReveal(room);
     clearTimeout(room.holds.get(me.id));

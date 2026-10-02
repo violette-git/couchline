@@ -7,7 +7,7 @@ import { FilePlayer } from './players/file.js';
 import { parseMedia, mediaWarnings, IN_BOX } from './media.js';
 import { FileShare, fingerprint, probeVideo, formatSize } from './share.js';
 import { Call } from './call.js';
-import { $, el, store, colorOf, toast } from './ui.js';
+import { $, el, store, colorOf, toast, listNames } from './ui.js';
 import { initSocial } from './social.js';
 import { initAdding, handleShareLanding } from './adding.js';
 
@@ -132,6 +132,17 @@ function enterRoom(opts) {
   socket = window.io({ transports: ['websocket', 'polling'] });
   clock = new Clock(socket);
   call = new Call({ socket, selfId: clientId, tilesEl: $('#tiles') });
+  call.onVideoChange = () => {
+    renderCallButtons();
+    if (call.active && call.videoAllowed && !call.camOn) toast({ text: 'A camera spot opened. Tap Turn camera on to use it.' });
+  };
+  // The tile count lets the layout fit everyone's faces on screen.
+  new MutationObserver(() => {
+    const n = $('#tiles').querySelectorAll('.tile:not(.audio-only)').length;
+    const size = n >= 4 ? 'large' : n === 3 ? 'mid' : 'small';
+    if ($('#tiles').dataset.size !== size) $('#tiles').dataset.size = size;
+  })
+    .observe($('#tiles'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
   share = new FileShare({ socket, onChange: renderLocal, onNotice: shareNotice });
   const restored = share.restore(); // copies downloaded before a reload
   social = initSocial({ socket, clientId, getRoom: () => room, expectedNow, durationNow, isLive, thumbUrl });
@@ -150,7 +161,7 @@ function enterRoom(opts) {
       adding ||= initAdding({ socket, roomId, config: { youtubeSearch: !!res.youtubeSearch } });
       adding.flushShared();
       await clock.calibrate();
-      if (call.active) socket.emit('call:state', { inCall: true });
+      if (call.active) socket.emit('call:state', call.callState());
     });
   });
   socket.on('disconnect', () => toast({ text: 'Connection lost. Reconnecting.' }));
@@ -304,7 +315,7 @@ function renderExtNote(cur) {
     note.textContent = `Synced through the Couchline extension. Play, pause, or seek on ${cur.service} and everyone follows. This tab works as a remote.`;
   } else if (viewers.some((m) => m.ext)) {
     const names = missing.map((m) => (m.id === clientId ? 'you (this tab)' : m.name));
-    note.textContent = `Automatic sync turns on when everyone watching is on the Couchline extension. Still needed: ${names.join(' and ')}.`;
+    note.textContent = `Automatic sync turns on when everyone watching is on the Couchline extension. Still needed: ${listNames(names)}.`;
     becomeRemote.hidden = !missing.some((m) => m.id === clientId);
   } else {
     note.textContent = `On a computer? With the Couchline extension, ${cur.service} plays in sync on its own.`;
@@ -507,10 +518,10 @@ function updateSyncPill(playing) {
   const mine = self()?.drift;
   const cur = room.current;
   const lacking = cur?.kind === 'local' ? room.members.filter((m) => !m.remote && !m.ext && !m.files?.includes(cur.fp)) : [];
-  if (room.holds.length) { text = `Waiting for ${room.holds.join(' and ')}`; mode = 'wait'; }
+  if (room.holds.length) { text = `Waiting for ${listNames(room.holds)}`; mode = 'wait'; }
   else if (lacking.length) {
     const names = lacking.map((m) => (m.id === clientId ? 'You' : m.name));
-    text = `${names.join(' and ')} ${names.length > 1 || names[0] === 'You' ? 'don’t' : 'doesn’t'} have the file yet`;
+    text = `${listNames(names)} ${names.length > 1 || names[0] === 'You' ? 'don’t' : 'doesn’t'} have the file yet`;
     mode = 'wait';
   }
   else if (!playing) { text = 'Paused'; mode = 'idle'; }
@@ -963,8 +974,16 @@ function renderCallButtons() {
   $('#joinCallBtn').hidden = call.active;
   $('#micBtn').hidden = !call.active;
   $('#camBtn').hidden = !call.active || !call.camOn;
+  $('#camOnBtn').hidden = !call.active || call.camOn || !call.videoAllowed;
   $('#leaveCallBtn').hidden = !call.active;
+  const waiting = call.active && !call.videoAllowed;
+  $('#callNote').hidden = !waiting;
+  if (waiting) $('#callNote').textContent = 'Five cameras are on, so you’re on audio. You’ll get a Turn camera on button when a spot opens.';
 }
+$('#camOnBtn').addEventListener('click', async () => {
+  if (!(await call.enableCamera())) toast({ text: 'The camera couldn’t start. It may be blocked or busy in another app.' });
+  renderCallButtons();
+});
 $('#joinCallBtn').addEventListener('click', startCall);
 $('#leaveCallBtn').addEventListener('click', () => { call.leave(); renderCallButtons(); });
 $('#micBtn').addEventListener('click', (e) => { e.target.textContent = call.toggleMic() ? 'Mute' : 'Unmute'; });

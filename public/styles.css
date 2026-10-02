@@ -1,5 +1,6 @@
 /* Couchline
-   Dusk indigo room. Each person in the room owns a color (lamp, rose, sky, mint),
+   Dusk indigo room. Each person in the room owns a color (lamp, rose, sky, mint, and for
+   bigger groups lilac, lime, orchid, iris),
    and that color only ever means "this person did this": their dot, their toasts,
    their reactions, their call tile, and the countdown they started.
    Buttons and chrome stay neutral so the person colors keep their meaning. */
@@ -16,6 +17,10 @@
   --rose: #F08A8A;
   --sky: #7CC4F0;
   --mint: #7DD8B0;
+  --lilac: #C3A2F5;
+  --lime: #C9E36F;
+  --orchid: #EE93D6;
+  --iris: #8FA2FA;
   --error: #FFB3A6;
   --font: 'Bricolage Grotesque', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --r-small: 10px;
@@ -82,6 +87,10 @@ a:hover { text-decoration-color: currentColor; }
 [data-color="rose"] { --c: var(--rose); }
 [data-color="sky"] { --c: var(--sky); }
 [data-color="mint"] { --c: var(--mint); }
+[data-color="lilac"] { --c: var(--lilac); }
+[data-color="lime"] { --c: var(--lime); }
+[data-color="orchid"] { --c: var(--orchid); }
+[data-color="iris"] { --c: var(--iris); }
 
 /* ---------- buttons and inputs ---------- */
 .btn {
@@ -553,6 +562,22 @@ a.brand:hover { opacity: 0.8; }
 @media (max-width: 479px) { .is-full:has(#controls:not([hidden])) { --bar: 8.25rem; } }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; }
 .tiles:empty { display: none; }
+
+/* Someone on audio (no camera spot, or no camera) shows as a name, not a blank picture. */
+.tile.audio-only { aspect-ratio: auto; height: 44px; grid-column: 1 / -1; box-shadow: none; animation: none; }
+.tile.audio-only video { display: none; }
+.tile.audio-only figcaption { position: static; display: flex; align-items: center; gap: 0.5rem; height: 100%; max-width: none; padding: 0 0.75rem; background: none; }
+.tile.audio-only figcaption::before { content: ''; flex: none; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--c, var(--muted)); }
+.call-note { margin: 0; padding: 0 1rem; }
+
+/* Bigger groups: two columns of faces where one column would run off the screen. */
+[data-call-layout="half"] .tiles:is([data-size="mid"], [data-size="large"]) { grid-template-columns: 1fr 1fr; }
+[data-call-layout="over"] .tiles[data-size="large"] { grid-template-columns: 1fr 1fr; }
+[data-call-layout="over"] .main > .call:has(.tiles[data-size="large"]) { width: clamp(220px, 34%, 380px); }
+[data-call-layout="over"] .main > .call, .is-full .main > .call { max-height: calc(100% - 1.5rem); overflow-y: auto; scrollbar-width: none; }
+.is-full:not([data-call-layout="half"]) .main > .call { max-height: calc(100svh - 10rem); }
+.is-full:not([data-call-layout="half"]) .tiles[data-size="large"] { grid-template-columns: 1fr 1fr; }
+.is-full:not([data-call-layout="half"]) .main > .call:has(.tiles[data-size="large"]) { width: clamp(260px, 28vw, 440px); }
 .tile { position: relative; margin: 0; aspect-ratio: 4 / 3; background: var(--screen); border-radius: var(--r-medium); overflow: hidden; border: 2px solid var(--c, var(--line)); box-shadow: var(--shadow-2); animation: tile-in 0.45s var(--ease-out) backwards; transition: transform var(--t-med) var(--ease-out), box-shadow var(--t-med) ease-out; }
 @keyframes tile-in { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
 @media (hover: hover) { .tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-3); } }
@@ -773,6 +798,9 @@ a.brand:hover { opacity: 0.8; }
   .call { position: fixed; top: calc(0.5rem + env(safe-area-inset-top)); right: calc(0.5rem + env(safe-area-inset-right)); width: 150px; padding: 0; z-index: 7; }
   .tiles { grid-template-columns: 1fr; }
   .tile { aspect-ratio: 4 / 3; }
+  .call { max-height: calc(100svh - 1rem); overflow-y: auto; scrollbar-width: none; }
+  .call:has(.tiles[data-size="large"]) { width: 230px; }
+  .tiles[data-size="large"] { grid-template-columns: 1fr 1fr; }
   .tile:first-child:not(:only-child) { display: none; } /* hide your own face, keep theirs */
   /* Full screen on a phone on its side looks the same; the chat box floats above the controls. */
   .is-full { --stack: 0rem; }

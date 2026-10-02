@@ -1,7 +1,7 @@
 // The room's social layer: chat (with messages floating over the video), typing, pings on the
 // video, starred moments on the timeline, the ready check, rating together, the watched
 // history, stepping away, and following someone's Instagram scrolling.
-import { $, el, colorOf, toast, clockTime, shortDate } from './ui.js';
+import { $, el, colorOf, toast, clockTime, shortDate, listNames } from './ui.js';
 import { fmt } from './sync.js';
 import { parseMedia } from './media.js';
 
@@ -162,7 +162,7 @@ export function initSocial({ socket, clientId, getRoom, expectedNow, durationNow
     const now = Date.now();
     for (const [id, t] of typing) if (t.until < now) typing.delete(id);
     const names = [...typing.values()].map((t) => t.name);
-    const text = names.length ? `${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} typing` : '';
+    const text = names.length ? `${listNames(names)} ${names.length > 1 ? 'are' : 'is'} typing` : '';
     for (const id of ['#typingNote', '#typingQuick']) {
       $(id).textContent = text;
       $(id).hidden = !text;
@@ -241,7 +241,7 @@ export function initSocial({ socket, clientId, getRoom, expectedNow, durationNow
     $('#readyBtn').classList.toggle('btn-primary', !mine);
     const waiting = viewers.filter((m) => !ids.includes(m.id)).map((m) => (m.id === clientId ? 'you' : m.name));
     $('#readyNote').textContent = ids.length
-      ? `Ready: ${viewers.filter((m) => ids.includes(m.id)).map((m) => m.name).join(', ')}. Waiting for ${waiting.join(' and ')}.`
+      ? `Ready: ${listNames(viewers.filter((m) => ids.includes(m.id)).map((m) => m.name))}. Waiting for ${listNames(waiting)}.`
       : 'When everyone taps ready, it starts by itself.';
   }
 
@@ -270,7 +270,7 @@ export function initSocial({ socket, clientId, getRoom, expectedNow, durationNow
     }
     if (r.answered.includes(clientId)) {
       const waiting = viewers.filter((m) => !r.answered.includes(m.id)).map((m) => m.name);
-      card.replaceChildren(el('p', { class: 'rate-q' }, `Rated ${title}.`), el('p', { class: 'hint' }, waiting.length ? `Scores show when ${waiting.join(' and ')} ${waiting.length > 1 ? 'answer' : 'answers'}.` : 'Revealing.'));
+      card.replaceChildren(el('p', { class: 'rate-q' }, `Rated ${title}.`), el('p', { class: 'hint' }, waiting.length ? `Scores show when ${listNames(waiting)} ${waiting.length > 1 ? 'answer' : 'answers'}.` : 'Revealing.'));
       return;
     }
     card.replaceChildren(

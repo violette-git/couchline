@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Couchline">
-  <meta name="description" content="Watch YouTube, Vimeo, Twitch, your own videos, Netflix, and Hulu together from two places.">
+  <meta name="description" content="Watch YouTube, Vimeo, Twitch, your own videos, Netflix, and Hulu together, wherever you are.">
   <title>Couchline</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -24,7 +24,7 @@
     <div class="landing-inner">
       <p class="pair" aria-hidden="true"><span class="seat" data-color="lamp"></span><span class="seat" data-color="rose"></span></p>
       <h1 class="marquee">Couch&shy;line</h1>
-      <p class="lede">Watch together from two places. YouTube, Vimeo, Twitch, and your own video links stay in sync on their own. Netflix and Hulu sync with the Couchline extension, or start on a shared countdown.</p>
+      <p class="lede">Watch together from different places. YouTube, Vimeo, Twitch, and your own video links stay in sync on their own. Netflix and Hulu sync with the Couchline extension, or start on a shared countdown.</p>
       <div class="landing-actions">
         <button id="createRoom" class="btn btn-primary btn-big">Start a room</button>
         <form id="joinCode" class="join-code">
@@ -136,7 +136,7 @@
             <p id="streamService" class="stream-service"></p>
             <h2 id="streamTitle" class="stream-title"></h2>
             <p id="streamEp" class="stream-ep"></p>
-            <p id="streamHint" class="hint">Open it on your own screen and pause at the start. When you’re both ready, tap Start together.</p>
+            <p id="streamHint" class="hint">Open it on your own screen and pause at the start. When everyone’s ready, tap Start together.</p>
             <p id="extNote" class="hint ext-note" hidden></p>
             <p><button id="becomeRemote" class="btn btn-small" hidden>Use this tab as a remote</button></p>
           </div>
@@ -197,6 +197,7 @@
             <button id="joinCallBtn" class="btn btn-small">Join call</button>
             <button id="micBtn" class="btn btn-small" hidden>Mute</button>
             <button id="camBtn" class="btn btn-small" hidden>Camera off</button>
+            <button id="camOnBtn" class="btn btn-small" hidden>Turn camera on</button>
             <button id="devicesBtn" class="btn btn-small" aria-expanded="false" aria-controls="devicePanel">Camera and mic</button>
             <button id="leaveCallBtn" class="btn btn-quiet btn-small" hidden>Leave call</button>
           </div>
@@ -209,6 +210,8 @@
             <button id="fullBtn" class="btn btn-small">Full screen</button>
           </div>
         </div>
+
+        <p id="callNote" class="note call-note" hidden role="status"></p>
 
         <div id="devicePanel" class="device-panel" hidden>
           <label class="field">Camera <select id="camSelect"></select></label>

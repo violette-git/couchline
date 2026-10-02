@@ -78,9 +78,11 @@
         <button id="joinCallBtn" class="btn btn-small">Join call</button>
         <button id="micBtn" class="btn btn-small" hidden>Mute</button>
         <button id="camBtn" class="btn btn-small" hidden>Camera off</button>
+        <button id="camOnBtn" class="btn btn-small" hidden>Turn camera on</button>
         <button id="devicesBtn" class="btn btn-small" aria-expanded="false" aria-controls="devicePanel">Camera and mic</button>
         <button id="leaveCallBtn" class="btn btn-quiet btn-small" hidden>Leave call</button>
       </div>
+      <p id="callNote" class="note call-note" hidden role="status"></p>
       <div id="devicePanel" class="device-panel side-devices" hidden>
         <label class="field">Camera <select id="camSelect"></select></label>
         <label class="field">Microphone <select id="micSelect"></select></label>

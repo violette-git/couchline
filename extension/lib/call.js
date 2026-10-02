@@ -14,6 +14,9 @@ const prefs = {
 const AUDIO = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
 const VIDEO = { width: { ideal: 640 }, height: { ideal: 480 } };
 const pick = (id) => (id ? { deviceId: { exact: id } } : {});
+const VIDEO_SLOTS = 5; // matches the server
+// On audio: no camera spot, or a spot but the camera isn't on yet.
+const isAudioOnly = (m) => !!m.inCall && (m.video === false || m.camOn === false);
 
 function blankVideoTrack() {
   try {
@@ -40,12 +43,26 @@ export class Call {
     this.stream = null;
     this.active = false;
     this.camOn = false;
+    // Cameras are capped (the server hands out spots). Without a spot you're on audio,
+    // and when one opens you can turn your camera on.
+    this.videoAllowed = true;
+    this.wantsCam = true;
+    this.onVideoChange = null;
+  }
+
+  // What the server needs to know: in the call, and whether this person has a camera to use.
+  callState() {
+    return { inCall: this.active, cam: this.active && this.wantsCam, live: this.active && this.camOn };
   }
 
   async start() {
     const { camera, mic } = prefs.get();
     const audio = { ...AUDIO, ...pick(mic) };
-    const tries = [
+    // Every camera spot taken: join on audio without touching the camera.
+    const onCamera = this.members.filter((m) => m.id !== this.selfId && m.inCall && m.video).length;
+    const full = onCamera >= VIDEO_SLOTS;
+    this.videoAllowed = !full;
+    const tries = full ? [{ audio, video: false }, { audio: AUDIO, video: false }] : [
       { audio, video: camera ? { ...VIDEO, ...pick(camera) } : { ...VIDEO, facingMode: 'user' } },
       // The remembered devices may be unplugged, so fall back to the defaults.
       { audio: AUDIO, video: { ...VIDEO, facingMode: 'user' } },
@@ -60,6 +77,8 @@ export class Call {
     }
     if (!this.stream) return false;
     this.camOn = this.stream.getVideoTracks().length > 0;
+    // Waiting for a camera spot still counts as wanting one; no camera at all doesn't.
+    this.wantsCam = this.camOn || full;
     if (!this.camOn) {
       const blank = blankVideoTrack();
       if (blank) this.stream.addTrack(blank);
@@ -69,9 +88,39 @@ export class Call {
     self.video.muted = true;
     self.video.srcObject = this.stream;
     this.applyMirror();
-    this.socket.emit('call:state', { inCall: true });
+    self.el.classList.toggle('cam-off', !this.camOn);
+    this.socket.emit('call:state', this.callState());
     this.sync(this.members);
     return true;
+  }
+
+  // Camera spot opened up (or this person had none and wants to try): turn the camera on.
+  async enableCamera() {
+    if (!this.active || this.camOn) return this.camOn;
+    const ok = await this.useDevice('camera', prefs.get().camera || '', { remember: false });
+    if (!ok && prefs.get().camera) await this.useDevice('camera', '', { remember: false });
+    if (!this.camOn) return false;
+    this.wantsCam = true;
+    this.socket.emit('call:state', this.callState());
+    this.onVideoChange?.();
+    return true;
+  }
+
+  // Back to audio: the camera stops and a blank picture stands in.
+  toAudio() {
+    const old = this.stream?.getVideoTracks()[0];
+    const blank = blankVideoTrack();
+    if (!old || !blank) return;
+    for (const pc of this.pcs.values()) {
+      const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+      sender?.replaceTrack(blank).catch(() => {});
+    }
+    this.stream.removeTrack(old);
+    old.stop();
+    this.stream.addTrack(blank);
+    this.camOn = false;
+    this.tile(this.selfId).el.classList.add('cam-off');
+    this.socket.emit('call:state', this.callState());
   }
 
   leave() {
@@ -106,14 +155,15 @@ export class Call {
 
   // Switches camera, mic, or speaker in the middle of a call without reconnecting:
   // the new track replaces the old one on every connection.
-  async useDevice(kind, deviceId) {
+  async useDevice(kind, deviceId, { remember = true } = {}) {
     if (kind === 'speaker') {
       prefs.set({ speaker: deviceId });
       for (const [id, t] of this.tiles) if (id !== this.selfId) t.video.setSinkId?.(deviceId).catch(() => {});
       return true;
     }
-    prefs.set(kind === 'camera' ? { camera: deviceId } : { mic: deviceId });
+    if (remember) prefs.set(kind === 'camera' ? { camera: deviceId } : { mic: deviceId });
     if (!this.active || !this.stream) return true; // used when the call starts
+    if (kind === 'camera' && !this.videoAllowed) return true; // no camera spot right now
     const video = kind === 'camera';
     let fresh;
     try {
@@ -173,6 +223,17 @@ export class Call {
   // Called with every room state update.
   sync(members) {
     this.members = members;
+    // Camera spot changes: losing one (a race at joining) goes back to audio; gaining one
+    // offers the camera (the app shows a "Turn camera on" button).
+    const mine = members.find((m) => m.id === this.selfId);
+    if (this.active && mine?.inCall && mine.video != null) {
+      const allowed = !!mine.video;
+      if (allowed !== this.videoAllowed) {
+        this.videoAllowed = allowed;
+        if (!allowed && this.camOn) this.toAudio();
+        this.onVideoChange?.();
+      }
+    }
     const others = members.filter((m) => m.id !== this.selfId && m.inCall);
     for (const id of [...this.pcs.keys()]) {
       if (!this.active || !others.some((m) => m.id === id)) this.drop(id);
@@ -184,6 +245,9 @@ export class Call {
       if (!t) continue;
       t.label.textContent = m.id === this.selfId ? `${m.name} (you)` : m.name;
       t.el.dataset.color = m.color;
+      // Someone without a camera spot shows as a name, not a blank picture.
+      if (m.id !== this.selfId) t.el.classList.toggle('audio-only', isAudioOnly(m));
+      else t.el.classList.toggle('audio-only', this.active && !this.camOn);
     }
   }
 
@@ -201,13 +265,25 @@ export class Call {
         t.video.play?.().catch(() => {});
       }
     };
-    pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === 'failed') {
-        this.drop(id);
-        this.sync(this.members);
+    // A connection that fails, or stays disconnected for 5 seconds, is rebuilt on both sides.
+    const watch = () => {
+      if (this.pcs.get(id) !== pc) return;
+      const states = [pc.connectionState, pc.iceConnectionState];
+      if (states.includes('failed')) return this.restart(id);
+      clearTimeout(pc.couchlineLost);
+      if (states.includes('disconnected')) {
+        pc.couchlineLost = setTimeout(() => {
+          if (this.pcs.get(id) === pc && [pc.connectionState, pc.iceConnectionState].includes('disconnected')) this.restart(id);
+        }, 5000);
       }
     };
+    pc.onconnectionstatechange = watch;
+    pc.oniceconnectionstatechange = watch;
     if (this.selfId < id) {
+      // The side that makes the offer also retries a connection that never gets going.
+      pc.couchlineWatchdog = setTimeout(() => {
+        if (this.pcs.get(id) === pc && pc.connectionState !== 'connected') this.restart(id);
+      }, 20000);
       pc.onnegotiationneeded = async () => {
         try {
           await pc.setLocalDescription(await pc.createOffer());
@@ -221,14 +297,27 @@ export class Call {
   }
 
   drop(id) {
+    const old = this.pcs.get(id);
+    if (old) { clearTimeout(old.couchlineLost); clearTimeout(old.couchlineWatchdog); }
     this.pcs.get(id)?.close();
     this.pcs.delete(id);
     this.pendingIce.delete(id);
     this.removeTile(id);
   }
 
+  // Starts a connection over, and asks the other side to do the same.
+  restart(id) {
+    this.send(id, { reset: true });
+    this.drop(id);
+    this.sync(this.members);
+  }
+
   async handleSignal({ from, msg }) {
     if (!this.active || !msg) return;
+    if (msg.reset) {
+      if (this.pcs.has(from)) { this.drop(from); this.sync(this.members); }
+      return;
+    }
     let pc = this.pcs.get(from);
     // A stale connection gets replaced before handling a fresh offer (as WatchParty does).
     if (pc && msg.sdp?.type === 'offer' && ['failed', 'closed'].includes(pc.connectionState)) {
@@ -278,6 +367,8 @@ export class Call {
     const m = this.members.find((x) => x.id === id);
     label.textContent = m ? (id === this.selfId ? `${m.name} (you)` : m.name) : '';
     if (m) el.dataset.color = m.color;
+    // A tile made after the last room update still shows whether they're on audio.
+    if (m && id !== this.selfId && isAudioOnly(m)) el.classList.add('audio-only');
     el.append(video, label);
     if (id === this.selfId) this.tilesEl.prepend(el);
     else this.tilesEl.append(el);

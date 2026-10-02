@@ -1,6 +1,6 @@
 # Couchline
 
-Watch together from two places, on computers and phones (and a TV browser if you have one).
+Watch together from different places, on computers and phones (and a TV browser if you have one). Rooms have no size limit; the video call shows up to 5 cameras.
 
 | Source | How it works |
 | --- | --- |
@@ -110,7 +110,7 @@ Calls connect directly when they can. On cell data or strict Wi-Fi, a relay serv
 heroku config:set TURN_URLS=turn:host:3478,turns:host:5349 TURN_USERNAME=... TURN_CREDENTIAL=...
 ```
 
-## Tips for the two of you
+## Tips
 
 - Wear headphones. Without them, the call mic picks up the show.
 - iPhone: the first video in a room may ask you to tap the video once. After that it syncs on its own.
@@ -124,6 +124,8 @@ heroku config:set TURN_URLS=turn:host:3478,turns:host:5349 TURN_USERNAME=... TUR
 - Anyone with the room link can join. Room codes are hard to guess, but there's no password yet.
 - YouTube and Twitch ads play separately for each person. The app catches the ad-watcher back up afterward.
 - One server instance only. Running several would need Redis for shared room state.
+- The call connects everyone to everyone, so it shows up to 5 cameras. People who join after that are on audio (shown as their name) and get a "Turn camera on" button when a camera spot opens. Rooms themselves have no size limit, and everything else (sync, chat, the queue) works for any number of people.
+- There are 8 person colors; a ninth person shares a color with someone.
 
 ## Credits
 

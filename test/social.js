@@ -202,6 +202,35 @@ a.emit('played:clear'); await wait(50);
 assert.equal(b.last.played.length, 0);
 check.ok('everything that was on stays in Played: play again, add back, remove, clear');
 
+// ---- groups: 8 colors, 5 cameras, audio past that ----
+const crowd = [];
+for (let i = 0; i < 7; i++) crowd.push(client(PORT, `P${i}`, 'social-room-big'));
+await Promise.all(crowd.map((s) => s.joined));
+await wait(80);
+const colors = crowd[0].last.members.map((m) => m.color);
+assert.equal(new Set(colors).size, 7, `seven people get seven different colors: ${colors}`);
+// Everyone joins the call with a camera except P5, who has none.
+for (let i = 0; i < 7; i++) { crowd[i].emit('call:state', { inCall: true, cam: i !== 5 }); await wait(15); }
+await wait(80);
+const video = () => Object.fromEntries(crowd[0].last.members.map((m) => [m.name, m.video]));
+assert.deepEqual(video(), { P0: true, P1: true, P2: true, P3: true, P4: true, P5: false, P6: false }, 'the first five cameras are on video; the rest are on audio');
+crowd[1].emit('call:state', { inCall: false }); await wait(80);
+assert.equal(video().P6, true, 'when someone on camera leaves the call, the next person waiting gets the spot');
+assert.equal(video().P5, false, 'someone without a camera doesn’t take a spot');
+assert.equal(video().P1, null, 'someone out of the call has no spot');
+crowd[1].emit('call:state', { inCall: true, cam: true }); await wait(80);
+assert.equal(video().P1, false, 'rejoining goes to the back of the line');
+// A quick reconnect (network blip) keeps its camera spot instead of going to the back.
+crowd[2].disconnect(); await wait(80);
+const back = client(PORT, 'P2', 'social-room-big');
+await back.joined;
+back.emit('call:state', { inCall: true, cam: true, live: true }); await wait(80);
+assert.equal(video().P2, true, 'after a quick reconnect, P2 still has a camera spot');
+assert.equal(crowd[0].last.members.find((m) => m.name === 'P2').camOn, true);
+crowd.forEach((s) => s.disconnect());
+back.disconnect();
+check.ok('groups: distinct colors, five cameras, audio past that, spots passed on in order, kept across reconnects');
+
 // ---- chat and history come back after a restart ----
 const e = client(PORT, 'Ana', 'social-room-2', { cache: { queue: [], shows: [], played: [{ kind: 'youtube', url: 'https://youtu.be/dQw4w9WgXcQ', title: 'Old one' }, { kind: 'bogus' }], chat: a.last ? [{ text: 'hi again', name: 'Ana', color: 'lamp', at: 1 }, { text: '' }] : [], history: [{ title: 'Big Buck Bunny', kind: 'vimeo', votes: [{ name: 'Ana', score: 9, color: 'lamp' }] }] } });
 const je = await e.joined;

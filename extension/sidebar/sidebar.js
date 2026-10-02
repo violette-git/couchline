@@ -18,6 +18,8 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// "Ana", "Ana and Ben", "Ana, Ben, and Cy".
+const listNames = (names) => (names.length < 3 ? names.join(' and ') :`${names.slice(0, -1).join(', ')}, and ${names.at(-1)}`);
 const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
 const params = new URLSearchParams(location.hash.slice(1));
 const NONCE = params.get('n');
@@ -113,6 +115,7 @@ function join(opts) {
   socket = window.io(opts.server, { transports: ['websocket'], reconnectionDelayMax: 5000 });
   clock = new Clock(socket);
   call = new Call({ socket, selfId: clientId, tilesEl: $('#tiles') });
+  call.onVideoChange = renderCallButtons;
   if (opts.withCall) startCall(); // inside the click, so the camera prompt is allowed
 
   let joinedOnce = false;
@@ -124,7 +127,7 @@ function join(opts) {
       renderChat(res.chat || []);
       await clock.calibrate();
       pushState();
-      if (call.active) socket.emit('call:state', { inCall: true });
+      if (call.active) socket.emit('call:state', call.callState());
     });
   });
   socket.on('connect_error', () => {
@@ -205,7 +208,7 @@ function renderStatus() {
     showStart = !room.playback.playing;
   } else {
     const missing = room.members.filter((m) => !m.remote && m.ext !== SERVICE).map((m) => m.name);
-    status.textContent = `Countdown mode. Automatic sync starts when everyone watching uses the extension${missing.length ? `. Still needed: ${missing.join(' and ')}` : ''}.`;
+    status.textContent = `Countdown mode. Automatic sync starts when everyone watching uses the extension${missing.length ? `. Still needed: ${listNames(missing)}` : ''}.`;
     showStart = true;
   }
 
@@ -249,7 +252,7 @@ function renderTyping() {
   const now = Date.now();
   for (const [id, t] of typing) if (t.until < now) typing.delete(id);
   const names = [...typing.values()].map((t) => t.name);
-  $('#typingNote').textContent = names.length ? `${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} typing` : '';
+  $('#typingNote').textContent = names.length ? `${listNames(names)} ${names.length > 1 ? 'are' : 'is'} typing` : '';
   $('#typingNote').hidden = !names.length;
 }
 setInterval(renderTyping, 1000);
@@ -314,8 +317,16 @@ function renderCallButtons() {
   $('#joinCallBtn').hidden = !!call?.active;
   $('#micBtn').hidden = !call?.active;
   $('#camBtn').hidden = !call?.active || !call.camOn;
+  $('#camOnBtn').hidden = !call?.active || call.camOn || !call.videoAllowed;
   $('#leaveCallBtn').hidden = !call?.active;
+  const waiting = !!call?.active && !call.videoAllowed;
+  $('#callNote').hidden = !waiting;
+  if (waiting) $('#callNote').textContent = 'Five cameras are on, so you’re on audio until a spot opens.';
 }
+$('#camOnBtn').addEventListener('click', async () => {
+  if (!(await call?.enableCamera())) showToast({ text: 'The camera couldn’t start. It may be blocked or busy in another app.' });
+  renderCallButtons();
+});
 $('#joinCallBtn').addEventListener('click', startCall);
 $('#leaveCallBtn').addEventListener('click', () => { call.leave(); renderCallButtons(); });
 $('#micBtn').addEventListener('click', (e) => { e.target.textContent = call.toggleMic() ? 'Mute' : 'Unmute'; });
