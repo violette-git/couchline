@@ -1,5 +1,9 @@
 // Hangman: the drawing, the word so far, a keyboard for letters, and a box to guess it all.
+// Whoever chooses the word also gives its topic, which guessers see above the word.
 import { keyboard, answerBox } from './kit.js';
+
+// One tap fills the topic; anything typed works too.
+const TOPICS = ['Movies and TV', 'Animals', 'Food', 'Places', 'Famous people', 'Things', 'Inside joke'];
 
 const MAX_WRONG = 6;
 // The figure, one part per wrong guess.
@@ -26,18 +30,43 @@ export default function mount(root, api) {
   const { el } = api;
   let chooseBox = null;
 
+  // The word and its topic, kept between updates so typing isn't interrupted.
+  function chooser() {
+    const word = el('input', { class: 'hm-input', placeholder: 'Your secret word or phrase', maxlength: '40', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': 'Your secret word or phrase' });
+    const topic = el('input', { class: 'hm-input', placeholder: 'Topic, like “90s movie” (optional)', maxlength: '30', autocomplete: 'off', 'aria-label': 'Topic' });
+    const chips = el('div', { class: 'hm-topics', role: 'group', 'aria-label': 'Pick a topic' }, ...TOPICS.map((t) => el('button', {
+      type: 'button', class: 'chip', 'aria-pressed': 'false',
+      onclick: () => { topic.value = t; mark(); },
+    }, t)));
+    const mark = () => { for (const c of chips.children) c.setAttribute('aria-pressed', String(c.textContent === topic.value.trim())); };
+    topic.addEventListener('input', mark);
+    const form = el('form', { class: 'hm-choose' },
+      el('label', { class: 'hm-field' }, el('span', {}, 'Word'), word),
+      el('label', { class: 'hm-field' }, el('span', {}, 'Topic'), topic),
+      chips,
+      el('button', { class: 'btn btn-primary' }, 'Use it'));
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!word.value.trim()) return word.focus();
+      api.send({ word: word.value, topic: topic.value });
+    });
+    form.word = word;
+    return form;
+  }
+
   return {
     update(game) {
       const s = game.view;
       const setter = s.setter ? api.player(s.setter) : null;
       if (s.phase === 'choose') {
         if (s.setter === api.me) {
-          chooseBox ||= answerBox((word) => api.send({ word }), { placeholder: 'Your secret word or phrase', button: 'Use it', maxlength: 40 });
+          const first = !chooseBox;
+          chooseBox ||= chooser();
           root.replaceChildren(
             el('p', { class: 'g-big' }, 'Pick a word'),
-            el('p', { class: 'g-note' }, 'Only you see it. Letters, spaces, apostrophes, and hyphens.'),
+            el('p', { class: 'g-note' }, 'Only you see the word. Letters, spaces, apostrophes, and hyphens. Everyone sees the topic, as a clue.'),
             chooseBox);
-          chooseBox.input.focus();
+          if (first) chooseBox.word.focus();
           return { text: 'Choose the word', color: 'me' };
         }
         root.replaceChildren(el('p', { class: 'g-big hm-wait' }, `${setter?.name || 'Someone'} is picking a word`));
@@ -68,6 +97,7 @@ export default function mount(root, api) {
             s.misses.length ? el('p', { class: 'hm-misses', 'aria-label': 'Wrong letters' }, ...s.misses.map((l) => el('span', {}, l.toUpperCase()))) : null,
             setter ? el('p', { class: 'g-note' }, `${setter.id === api.me ? 'You' : setter.name} picked this one.`) : null,
             el('p', { class: 'g-note hm-log', 'aria-live': 'polite' }, lastLine))),
+        s.topic ? el('p', { class: 'hm-topic' }, el('span', {}, 'Topic'), s.topic) : null,
         el('div', { class: 'hm-word', 'aria-label': 'The word so far' }, ...words.map((w) => el('span', { class: 'hm-w' }, ...w))),
         canGuess ? keyboard((l) => api.send({ letter: l }), { states, disabled: !canGuess }) : null,
         canGuess ? answerBox((word) => api.send({ word }), { placeholder: 'Know it? Guess the whole thing', button: 'Guess', maxlength: 40 }) : null,

@@ -3,7 +3,8 @@
 //   min, max   how many players a game can start with
 //   coop       everyone plays together against the game, so wins aren't counted per person
 //   lateJoin   people can join after it has started
-//   options    choices made in the lobby before starting; the first choice is the default
+//   options    choices made in the lobby before starting; the first choice is the default.
+//              "when" shows an option only while other options have those values
 //   icon       the inside of a 24 by 24 line icon
 
 export const CATEGORIES = [
@@ -78,10 +79,10 @@ export const CATALOG = [
   {
     id: 'hangman', name: 'Hangman', aka: ['guess the word'], category: 'word', min: 1, max: 8, coop: true, lateJoin: true,
     blurb: 'Guess the word together.',
-    rules: 'Everyone guesses letters (or the whole word) together. Each wrong guess adds to the drawing; six and the word wins. Pick who chooses the word: Couchline, or the first player, who then sits out guessing.',
+    rules: 'Everyone guesses letters (or the whole word) together. Each wrong guess adds to the drawing; six and the word wins. Pick who chooses the word: Couchline, or the first player, who also names its topic as a clue and then sits out guessing.',
     options: [
       { key: 'from', label: 'The word comes from', choices: [{ value: 'random', label: 'Couchline' }, { value: 'player', label: 'First player' }] },
-      { key: 'topic', label: 'Topic', choices: [{ value: 'mixed', label: 'Mixed' }, { value: 'movies', label: 'Movies and TV' }, { value: 'animals', label: 'Animals' }, { value: 'food', label: 'Food' }] },
+      { key: 'topic', label: 'Topic', when: { from: 'random' }, choices: [{ value: 'mixed', label: 'Mixed' }, { value: 'movies', label: 'Movies and TV' }, { value: 'animals', label: 'Animals' }, { value: 'food', label: 'Food' }] },
     ],
     icon: '<path d="M5 21h10M8 21V3h8v3"/><circle cx="16" cy="8.5" r="2.5"/><path d="M16 11v5M13.5 13h5"/>',
   },
