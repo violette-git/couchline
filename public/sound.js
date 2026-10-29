@@ -1,13 +1,16 @@
-// Little sounds for games, made on the spot with Web Audio (no files to download). Kept soft
-// and short so they sit under the call: a tap for every button, a thud when a move isn't
-// allowed, a chime when it's your turn, and short tunes to start and finish. Muting is
-// remembered on this device.
-import { store } from '../ui.js';
+// Little sounds, made on the spot with Web Audio (no files to download), kept soft and short
+// so they sit under the call and the show. Two kinds, each switched off on its own and
+// remembered on this device:
+//   games  a tap for every button, a thud when a move isn't allowed, a chime when it's your
+//          turn, and short tunes to start and finish
+//   chat   a soft note when someone else sends a message (brighter when it names you). These
+//          play in a background tab too, since that's when you'd miss a message.
+import { store } from './ui.js';
 
-const KEY = 'gameSound';
+const KEYS = { games: 'gameSound', chat: 'chatSound' };
 let ctx = null;
 let master = null;
-let muted = store.get(KEY, false);
+const muted = { games: store.get(KEYS.games, false), chat: store.get(KEYS.chat, false) };
 
 function audio() {
   if (!ctx) {
@@ -59,17 +62,29 @@ const SOUNDS = {
   lose() { [G4, Eb4, C4].forEach((f, i) => note(f, { at: i * 0.14, dur: 0.32, type: 'triangle', gain: 0.07, attack: 0.01 })); },
   end() { [G5, C5].forEach((f, i) => note(f, { at: i * 0.12, dur: 0.25, type: 'triangle', gain: 0.06 })); },
   tick() { note(1800, { dur: 0.03, type: 'square', gain: 0.025 }); },
+  message() {
+    note(G5, { dur: 0.16, gain: 0.07, attack: 0.008 });
+    note(C6, { at: 0.08, dur: 0.24, gain: 0.07, attack: 0.008 });
+  },
+  mention() { [C6, E5 * 2, G5 * 2].forEach((f, i) => note(f, { at: i * 0.07, dur: 0.26, type: 'triangle', gain: 0.07 })); },
 };
 
 export const sound = {
-  play(name) {
-    if (muted || document.hidden || !SOUNDS[name] || !audio()) return;
+  // Game sounds stay quiet in a background tab; pass background for ones that shouldn't.
+  play(name, { kind = 'games', background = false } = {}) {
+    if (muted[kind] || (document.hidden && !background) || !SOUNDS[name] || !audio()) return;
     try { SOUNDS[name](); } catch { /* audio not available right now */ }
   },
-  get muted() { return muted; },
-  setMuted(on) {
-    muted = !!on;
-    store.set(KEY, muted);
-    if (!muted) sound.play('tap');
+  isMuted: (kind = 'games') => muted[kind],
+  setMuted(kind, on) {
+    muted[kind] = !!on;
+    store.set(KEYS[kind], muted[kind]);
+    if (!muted[kind]) sound.play(kind === 'chat' ? 'message' : 'tap', { kind });
+  },
+  // Browsers only let a page make sound after someone taps it, so start audio on a tap
+  // (entering the room is one). Then a message can chime even while the tab is in the back.
+  prime() {
+    audio();
+    for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => audio(), { once: true, capture: true });
   },
 };

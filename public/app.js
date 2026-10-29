@@ -17,6 +17,7 @@ import { initCreate, initBrowse, pendingRoom } from './rooms.js';
 import { initGames, renderShelf } from './games.js';
 import { REACTIONS } from './reactions.js';
 import { initGameVideo } from './gamevideo.js';
+import { sound } from './sound.js';
 
 const WORDS_A = ['maple', 'velvet', 'quiet', 'amber', 'cozy', 'late', 'lucky', 'sunny', 'hazel', 'cobalt'];
 const WORDS_B = ['couch', 'otter', 'lamp', 'porch', 'comet', 'pillow', 'fox', 'lantern', 'sofa', 'moth'];
@@ -150,6 +151,7 @@ function enterRoom(opts) {
   me.remote = opts.remote;
   document.body.classList.toggle('is-remote', me.remote);
   show('room');
+  sound.prime(); // inside the tap that entered the room, so sounds are allowed from here on
 
   socket = window.io({ transports: ['websocket', 'polling'] });
   clock = new Clock(socket);

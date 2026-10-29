@@ -4,6 +4,7 @@
 import { $, el, colorOf, toast, clockTime, shortDate, listNames } from './ui.js';
 import { fmt } from './sync.js';
 import { parseMedia } from './media.js';
+import { sound } from './sound.js';
 
 const LINK = /\b(?:https?:\/\/|www\.)[^\s<>"]+|\b(?:youtu\.be|(?:m\.)?youtube\.com|vimeo\.com|twitch\.tv|instagram\.com|netflix\.com|hulu\.com)\/[^\s<>"]+/gi;
 const HOLD_MS = 450;
@@ -66,6 +67,25 @@ export function initSocial({ socket, clientId, getRoom, expectedNow, durationNow
     if (launchFrom) sentFrom = null;
     flyMessage(m, launchFrom);
     if (m.from !== clientId && !chatOpen()) setUnread(unread + 1);
+    if (m.from !== clientId) chime(m);
+  }
+
+  // Whether a message names someone: their whole name, any case, with or without an @.
+  function mentions(text, name) {
+    if (!name || name.length < 2) return false;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^\\p{L}\\p{N}])@?${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(text);
+  }
+
+  // A soft note for someone else's message, brighter when it names you. A burst of messages
+  // gets one sound, not one each.
+  let lastChime = 0;
+  function chime(m) {
+    const now = Date.now();
+    const named = mentions(m.text, getRoom()?.members.find((x) => x.id === clientId)?.name);
+    if (!named && now - lastChime < 1500) return;
+    lastChime = now;
+    sound.play(named ? 'mention' : 'message', { kind: 'chat', background: true });
   }
 
   function setUnread(n) {
@@ -313,6 +333,9 @@ export function initSocial({ socket, clientId, getRoom, expectedNow, durationNow
   const reportPresence = () => socket.emit('presence', { away: document.visibilityState === 'hidden' });
   document.addEventListener('visibilitychange', reportPresence);
   $('#optAwayPause').addEventListener('change', (e) => socket.emit('settings:set', { pauseOnAway: e.target.checked }));
+  // Message sounds are each person's own choice, kept on this device.
+  $('#optChatSound').checked = !sound.isMuted('chat');
+  $('#optChatSound').addEventListener('change', (e) => sound.setMuted('chat', !e.target.checked));
 
   // ---------- following someone's Instagram ----------
   $('#followStop').addEventListener('click', () => socket.emit('follow:stop'));

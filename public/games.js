@@ -6,7 +6,7 @@
 // played. See games/README.md for how a game is put together.
 import { $, el, colorOf, toast } from './ui.js';
 import { CATALOG, CATEGORIES, GAME } from './games/catalog.js';
-import { sound } from './games/sound.js';
+import { sound } from './sound.js';
 
 const icon = (meta, cls = 'g-icon') => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -320,12 +320,13 @@ export function initGames({ socket, clientId, getRoom, now }) {
   });
   function renderSoundBtn() {
     const b = $('#gameSound');
-    b.setAttribute('aria-pressed', String(!sound.muted));
-    b.setAttribute('aria-label', sound.muted ? 'Turn game sounds on' : 'Turn game sounds off');
-    b.title = sound.muted ? 'Sounds off' : 'Sounds on';
-    b.classList.toggle('is-muted', sound.muted);
+    const off = sound.isMuted('games');
+    b.setAttribute('aria-pressed', String(!off));
+    b.setAttribute('aria-label', off ? 'Turn game sounds on' : 'Turn game sounds off');
+    b.title = off ? 'Game sounds off' : 'Game sounds on';
+    b.classList.toggle('is-muted', off);
   }
-  $('#gameSound').addEventListener('click', () => { sound.setMuted(!sound.muted); renderSoundBtn(); });
+  $('#gameSound').addEventListener('click', () => { sound.setMuted('games', !sound.isMuted('games')); renderSoundBtn(); });
   renderSoundBtn();
   // The moments that get their own sound: a game starting, your turn coming round, and the end.
   function cue(was, now) {

@@ -42,6 +42,7 @@ The free quota allows about 100 searches a day; results are cached for 10 minute
 ## Together
 
 - **Chat:** a Chat tab with a box right under the video, typing indicators, and an unread count. Messages float over the video when the chat isn't open, and in full screen. A message sent mid-video has an "at 12:03" link that takes everyone back there.
+- **Message sounds:** a soft note when someone else sends a message, and a brighter one when it names you (with or without an @). They play in a background tab too, so you hear them while you're in Netflix or another app's tab, and a burst of messages makes one sound. Turn them off in the room menu (just for you, remembered on that device).
 - **Point:** press and hold on the video to ping that spot on everyone's screen, in your color.
 - **Moments:** the star button marks a moment on everyone's timeline. Tap a mark to go there; right click to remove it.
 - **Ready check:** everyone taps I'm ready, and when the last person does, the countdown starts by itself.
