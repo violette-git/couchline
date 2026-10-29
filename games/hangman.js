@@ -1,6 +1,6 @@
 // Hangman, played together: everyone guesses letters of one hidden word or phrase. Six
 // wrong guesses and the word wins. The word comes from Couchline's lists, or the first
-// player types one and sits out guessing.
+// player types one (and its topic, as a clue) and sits out guessing.
 import { Nope, pick, text, squash } from './util.js';
 
 const WORDS = {
@@ -22,6 +22,10 @@ const WORDS = {
     'Quicksand', 'Roller Coaster', 'Scarecrow', 'Trampoline', 'Wristwatch', 'Yo-yo', 'Zipper', 'Blanket Fort', 'Pillow Fight', 'Movie Night'],
 };
 WORDS.mixed = [...WORDS.movies, ...WORDS.animals, ...WORDS.food, ...WORDS.everyday];
+// What guessers are told the word is. A mixed pick is told by the list it came from.
+const TOPICS = { movies: 'Movies and TV', animals: 'Animals', food: 'Food', everyday: 'Everyday things' };
+const topicOf = (word) => TOPICS[Object.keys(TOPICS).find((t) => WORDS[t].includes(word))];
+export const TOPIC_MAX = 30;
 
 export const MAX_WRONG = 6;
 const isLetter = (ch) => /[a-z]/i.test(ch);
@@ -42,7 +46,7 @@ function check(s, players) {
 
 export default {
   setup({ players, options, rng }) {
-    const s = { setter: null, phase: 'guess', word: null, guessed: [], wrong: 0, misses: [], log: [], turn: null, result: null, topic: options.topic };
+    const s = { setter: null, phase: 'guess', word: null, guessed: [], wrong: 0, misses: [], log: [], turn: null, result: null, topic: null };
     if (options.from === 'player') {
       if (players.length < 2) throw new Nope('Someone else has to play to guess your word. Pick Couchline’s word instead, or wait for a second player.');
       s.setter = players[0].id;
@@ -50,6 +54,7 @@ export default {
       s.turn = players[0].id;
     } else {
       begin(s, pick(WORDS[options.topic] || WORDS.mixed, rng));
+      s.topic = topicOf(s.word);
     }
     return s;
   },
@@ -59,6 +64,8 @@ export default {
       const word = text(m?.word, 40).replace(/\s+/g, ' ');
       if (!/^[a-z][a-z '-]*[a-z]$/i.test(word) || word.replace(/[^a-z]/gi, '').length < 3) throw new Nope('Use letters only, at least three of them. Spaces, apostrophes, and hyphens are fine.');
       begin(s, word);
+      // The topic is optional, and free text, so it can be as helpful or as sly as they like.
+      s.topic = (typeof m?.topic === 'string' && text(m.topic.replace(/\s+/g, ' '), TOPIC_MAX)) || null;
       s.turn = null;
       return;
     }

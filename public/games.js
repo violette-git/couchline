@@ -175,7 +175,8 @@ export function initGames({ socket, clientId, getRoom, now }) {
     const seated = game.seats.some((p) => p.id === clientId);
     const full = game.seats.length >= meta.max;
     const enough = game.seats.length >= meta.min;
-    const options = (meta.options || []).map((o) => el('div', { class: 'g-option' },
+    const shown = (meta.options || []).filter((o) => Object.entries(o.when || {}).every(([k, v]) => game.options[k] === v));
+    const options = shown.map((o) => el('div', { class: 'g-option' },
       el('span', { class: 'g-option-label' }, o.label),
       el('div', { class: 'seg', role: 'group', 'aria-label': o.label }, ...o.choices.map((c) => el('button', {
         type: 'button', 'aria-pressed': String(game.options[o.key] === c.value), disabled: !seated,
