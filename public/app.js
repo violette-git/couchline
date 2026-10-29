@@ -16,6 +16,7 @@ import { initAdding, handleShareLanding } from './adding.js';
 import { initCreate, initBrowse, pendingRoom } from './rooms.js';
 import { initGames, renderShelf } from './games.js';
 import { REACTIONS } from './reactions.js';
+import { initGameVideo } from './gamevideo.js';
 
 const WORDS_A = ['maple', 'velvet', 'quiet', 'amber', 'cozy', 'late', 'lucky', 'sunny', 'hazel', 'cobalt'];
 const WORDS_B = ['couch', 'otter', 'lamp', 'porch', 'comet', 'pillow', 'fox', 'lantern', 'sofa', 'moth'];
@@ -127,7 +128,7 @@ const inBox = (it) => IN_BOX.includes(it?.kind);
 const isLive = (it) => !!it?.live || (!!it && player?.key === it.id && player.live);
 
 // ---------- room ----------
-let socket, clock, call, share, social, adding, swipe, popout, games;
+let socket, clock, call, share, social, adding, swipe, popout, games, gameVideo;
 let room = null;
 let me = { remote: false };
 let lastItemId = null;
@@ -170,6 +171,7 @@ function enterRoom(opts) {
   popout = initPopout({ call, getRoom: () => room, onChange: () => renderCallButtons() });
   social = initSocial({ socket, clientId, getRoom: () => room, expectedNow, durationNow, isLive, thumbUrl });
   games = initGames({ socket, clientId, getRoom: () => room, now: () => clock.now() });
+  gameVideo = initGameVideo({ socket, getRoom: () => room, isRemote: () => me.remote });
   if (opts.call) startCall(); // inside the tap, so iOS allows camera and audio
 
   socket.on('connect', () => {
@@ -223,6 +225,7 @@ function onState(s) {
   social.onState(s);
   swipe.render(s);
   games.render(s);
+  gameVideo.render(s);
   renderCallButtons();
   call.sync(s.members);
   tick();

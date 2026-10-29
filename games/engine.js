@@ -113,6 +113,7 @@ export function createGames({ io, toast, broadcast, onOpen = () => {} }) {
     g.round = (g.round || 0) + 1;
     clearTimer(room);
     g.state = rules.setup({ players, options: g.options, rng: Math.random, round: g.round }, ctxFor(room));
+    broadcast(room); // the room's summary (in the Games tab) says it's on now
   }
 
   const isPlayer = (room, id) => !!room.game?.players.some((p) => p.id === id);
@@ -235,6 +236,7 @@ export function createGames({ io, toast, broadcast, onOpen = () => {} }) {
       g.phase = 'lobby';
       g.state = null;
       g.players = [];
+      broadcast(room);
       send(room);
       cb({ ok: true });
     },

@@ -407,10 +407,16 @@
           </div>
 
           <div id="playerWrap" class="fill" hidden>
+            <div id="pipBar" class="pip-bar" title="Drag to move. Double-click to put it back in the corner.">
+              <svg class="pip-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
+              <span id="pipTitle" class="pip-title"></span>
+              <button id="pipHide" class="pip-btn" type="button" aria-label="Hide the video for everyone" title="Hide for everyone">✕</button>
+            </div>
             <div id="playerSlot" class="player-slot"></div>
             <button id="tapShield" class="tap-shield" aria-label="Play or pause"></button>
             <p id="tapToStart" class="tap-banner" hidden>Tap the video once to start it on this device.</p>
             <p id="playerNote" class="player-note" hidden role="status"></p>
+            <span id="pipResize" class="pip-resize" title="Drag to resize" aria-hidden="true"></span>
             <div id="localCard" class="local-card" hidden>
               <p class="stream-service">A video file from someone’s device</p>
               <h2 id="localName" class="local-name"></h2>
@@ -490,11 +496,22 @@
               <p id="gameStatus" class="game-status" role="status"></p>
               <div class="game-bar-actions">
                 <button id="gameJoin" class="btn btn-primary btn-small" hidden>Join game</button>
+                <button id="gameVideoBtn" class="btn btn-quiet btn-small" aria-expanded="false" aria-controls="gameVideoPanel">Video</button>
                 <button id="gameRulesBtn" class="btn btn-quiet btn-small" aria-expanded="false" aria-controls="gameRules">How to play</button>
                 <button id="gameEnd" class="btn btn-quiet btn-small">Close</button>
               </div>
             </div>
             <p id="gameRules" class="game-rules" hidden></p>
+            <div id="gameVideoPanel" class="game-video-panel" hidden>
+              <p id="gameVideoNow" class="note"></p>
+              <form id="gameVideoForm" class="g-video-form">
+                <label for="gameVideoInput" class="sr">Video link</label>
+                <input id="gameVideoInput" placeholder="Paste a YouTube, Vimeo, TikTok, or video link" autocomplete="off" enterkeyhint="go">
+                <button class="btn btn-primary">Play</button>
+                <button id="gameVideoShow" type="button" class="btn" hidden>Show it</button>
+              </form>
+              <p id="gameVideoError" class="error" hidden></p>
+            </div>
             <div id="gameBody" class="game-body"></div>
             <div id="gameFoot" class="game-foot" hidden aria-live="polite"></div>
           </div>
@@ -609,7 +626,7 @@
             <p id="gameNowText" class="swipe-title"></p>
             <button id="gameNowGo" class="btn btn-small">Go to it</button>
           </div>
-          <p id="gamesHint" class="hint">Pick a game and it opens for everyone, right where the video plays. The video pauses while you play.</p>
+          <p id="gamesHint" class="hint">Pick a game and it opens for everyone, right where the video plays. The video pauses, or tap Video in the game to keep it on in a window you can move around.</p>
           <div class="browse-search g-search" role="search">
             <label for="gameSearch" class="sr">Search games</label>
             <input id="gameSearch" type="search" placeholder="Search games" autocomplete="off">

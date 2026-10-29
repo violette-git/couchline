@@ -61,6 +61,7 @@ assert.ok((await b.ask('game:start')).ok);
 await wait(50);
 assert.equal(a.game.phase, 'play');
 assert.equal(a.game.turn, 'ana');
+assert.equal(c.last.games.open.phase, 'play', 'the Games tab hears that it started');
 check.ok('seats fill up to the limit, and a seated player starts it');
 
 assert.match((await b.ask('game:move', { move: { cell: 0 } })).error, /turn/);
@@ -134,6 +135,28 @@ await wait(50);
 assert.equal(e.last.mode, 'games', 'a room restored after a restart stays a games room');
 e.disconnect();
 check.ok('the host makes a room a games room; it shows in public rooms and survives a restart');
+
+// A video over the game: it keeps playing when a game opens, and hiding it pauses it.
+{
+  const f = games(client(PORT, 'Fay', 'games-room-3'));
+  const g = games(client(PORT, 'Gus', 'games-room-3'));
+  await Promise.all([f.joined, g.joined]);
+  await f.ask('queue:add', { input: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ' });
+  assert.ok((await f.ask('game:video', { on: true })).ok);
+  f.emit('cmd:play', { position: 5 });
+  await wait(80);
+  assert.equal(g.last.gameVideo, true);
+  assert.ok((await g.ask('game:open', { type: 'tictactoe' })).ok);
+  await wait(60);
+  assert.equal(f.last.playback.playing, true, 'a video over the game keeps playing when a game opens');
+  assert.ok((await g.ask('game:video', { on: false })).ok);
+  await wait(60);
+  assert.equal(f.last.gameVideo, false);
+  assert.equal(f.last.playback.playing, false, 'hiding it pauses it for everyone');
+  assert.ok(f.toasts.some((t) => t.includes('Gus hid the video')));
+  f.disconnect(); g.disconnect();
+}
+check.ok('a video over the game keeps playing through it, for everyone, until it’s hidden');
 
 for (const s of [a, b, c]) s.disconnect();
 srv.kill();

@@ -224,6 +224,8 @@ function getRoom(roomId) {
       mode: 'watch',
       // The game everyone is playing (see games/engine.js), and wins so far.
       game: null, gameScores: {}, gameTimer: null,
+      // A video floating over the game in a small window everyone can move on their own screen.
+      gameVideo: false,
     };
     rooms.set(roomId, room);
   }
@@ -311,16 +313,18 @@ function publicState(room) {
     reels: { ...room.reels, driverName: room.members.get(room.reels.driver)?.name || null },
     settings: room.settings,
     games: games.summary(room),
+    gameVideo: room.gameVideo,
     serverNow: Date.now(),
   };
 }
 const toast = (room, text, by) => io.to(room.id).emit('toast', { text, color: by?.color || null });
 
-// Games take over the stage, so opening one pauses whatever is playing.
+// Games take over the stage, so opening one pauses whatever is playing, unless the video is
+// floating over the games.
 const games = createGames({
   io, toast, broadcast: (room) => broadcast(room),
   onOpen(room, by) {
-    if (!synced(room) || !room.playback.playing || Date.now() < room.playback.at) return;
+    if (room.gameVideo || !synced(room) || !room.playback.playing || Date.now() < room.playback.at) return;
     clearCountdown(room);
     clearHolds(room);
     setPlayback(room, false, posNow(room));
@@ -1202,6 +1206,16 @@ io.on('connection', (socket) => {
 
   // ----- games (rules and referee in games/) -----
   for (const [event, fn] of Object.entries(games.handlers)) on(event, (d, cb) => fn(room, me, d, cb));
+  // The video in a small window over the game, for everyone. Hiding it pauses it.
+  on('game:video', (d, cb) => {
+    const show = !!d.on;
+    if (show === room.gameVideo) return cb({ ok: true });
+    room.gameVideo = show;
+    if (!show && synced(room) && room.playback.playing) setPlayback(room, false, posNow(room));
+    broadcast(room);
+    toast(room, `${me.name} ${show ? 'put the video over the game' : 'hid the video'}`, me);
+    cb({ ok: true });
+  });
 
   on('follow:stop', () => {
     if (!room.follow) return;

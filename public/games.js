@@ -107,7 +107,7 @@ export function initGames({ socket, clientId, getRoom, now }) {
     wasGamesRoom = room.mode === 'games';
     $('#gamesHint').textContent = room.mode === 'games'
       ? 'Pick a game and it opens for everyone, right on the main screen.'
-      : 'Pick a game and it opens for everyone, right where the video plays. The video pauses while you play.';
+      : 'Pick a game and it opens for everyone, right where the video plays. The video pauses, or tap Video in the game to keep it on in a window you can move around.';
 
     const on = room.games?.open;
     const card = $('#gameNowCard');
