@@ -1,0 +1,59 @@
+.g-battleship { gap: 0.9rem; }
+.bs-boards { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 1.25rem 1.75rem; width: 100%; }
+.bs-side { display: grid; gap: 0.55rem; width: min(100%, 27rem); }
+.bs-side.is-small { width: min(100%, 15.5rem); }
+.bs-boards.is-watching .bs-side { width: min(100%, 22rem); }
+.bs-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.3rem 0.75rem; }
+.bs-title { display: inline-flex; align-items: center; gap: 0.45rem; font-weight: 650; font-size: 0.95rem; }
+.bs-title .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--c); }
+.is-small .bs-title { font-size: 0.85rem; color: var(--paper-2); }
+
+/* The fleet tracker: one bar per ship, crossed off when it sinks. */
+.bs-fleet { display: flex; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+.bs-fleet li { display: flex; gap: 1.5px; padding: 2px; border-radius: 4px; }
+.bs-fleet i { width: 6px; height: 6px; border-radius: 1.5px; background: color-mix(in srgb, var(--c) 55%, #3A4052); }
+.bs-fleet li.is-sunk { position: relative; opacity: 0.4; }
+.bs-fleet li.is-sunk i { background: var(--dim); }
+.bs-fleet li.is-sunk::after { content: ''; position: absolute; left: -1px; right: -1px; top: 50%; height: 1.5px; background: var(--paper); transform: rotate(-12deg); }
+.is-small .bs-fleet i { width: 4px; height: 4px; }
+
+/* The waters: a label row and column around 10 by 10 squares. */
+.bs-grid { display: grid; grid-template-columns: 0.95rem repeat(10, minmax(0, 1fr)); grid-template-rows: 0.95rem repeat(10, auto); gap: 2px; padding: 6px 6px 6px 3px; border-radius: var(--r-large);
+  background: #0F1626; box-shadow: inset 0 0 0 1px #1E2A44, var(--shadow-2); }
+.bs-grid.is-small { grid-template-columns: 0.7rem repeat(10, minmax(0, 1fr)); grid-template-rows: 0.7rem repeat(10, auto); gap: 1.5px; padding: 5px 5px 5px 2px; border-radius: var(--r-medium); }
+.bs-grid.is-live { box-shadow: inset 0 0 0 1px #2F4470, 0 0 0 3px rgb(123 151 214 / 0.1), var(--shadow-2); }
+.bs-label { display: grid; place-items: center; color: #5C6A8A; font-family: var(--mono); font-size: 0.62rem; line-height: 1; }
+.is-small .bs-label { font-size: 0.5rem; }
+.bs-cell { position: relative; display: grid; place-items: center; aspect-ratio: 1; min-width: 0; padding: 0; border: 0; border-radius: 4px; background: #16213A; color: var(--paper); }
+.is-small .bs-cell { border-radius: 2.5px; }
+button.bs-cell { cursor: crosshair; transition: background-color var(--t-fast), transform var(--t-fast) var(--ease-out); }
+button.bs-cell:not(:disabled):hover { background: #24345A; }
+button.bs-cell:not(:disabled):active { transform: scale(0.9); }
+button.bs-cell:disabled { cursor: default; }
+
+/* Ships: segments that join into one hull, rounded at the bow and stern. */
+.bs-hull { position: absolute; inset: 14%; background: color-mix(in srgb, var(--c) 34%, #333B50); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12); }
+.bs-hull.is-across { left: -1.5px; right: -1.5px; }
+.bs-hull.is-down { top: -1.5px; bottom: -1.5px; }
+.bs-hull.is-across.is-head { left: 12%; border-radius: 999px 0 0 999px; }
+.bs-hull.is-across.is-tail { right: 12%; border-radius: 0 999px 999px 0; }
+.bs-hull.is-down.is-head { top: 12%; border-radius: 999px 999px 0 0; }
+.bs-hull.is-down.is-tail { bottom: 12%; border-radius: 0 0 999px 999px; }
+.bs-hull.is-sunk { background: color-mix(in srgb, var(--c) 58%, #1A2133); box-shadow: none; }
+
+/* Shots: a quiet dot for a miss, a burst in the shooter's color for a hit. */
+.bs-miss { width: 22%; aspect-ratio: 1; border-radius: 50%; background: #5C6A8A; }
+.bs-hit { position: relative; width: 52%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 40% 35%, color-mix(in srgb, var(--c) 55%, #fff), var(--c) 60%); box-shadow: 0 0 0 2px rgb(15 22 38 / 0.6), 0 0 10px color-mix(in srgb, var(--c) 60%, transparent); }
+.bs-miss.is-new, .bs-hit.is-new { animation: g-pop 0.32s var(--ease-pop) backwards; }
+.bs-hit.is-new::after { content: ''; position: absolute; inset: -40%; border-radius: 50%; border: 2px solid var(--c); animation: bs-ripple 0.7s var(--ease-out) forwards; }
+.bs-cell.is-last { box-shadow: inset 0 0 0 1.5px rgb(243 244 247 / 0.55); }
+@keyframes bs-ripple { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+
+.bs-log { margin: 0; min-height: 1.5em; color: var(--muted); font-size: 0.95rem; text-align: center; text-wrap: pretty; }
+.bs-log.is-hit { color: var(--c); font-weight: 650; }
+
+@container (max-width: 560px) {
+  .bs-boards { gap: 1rem; }
+  .bs-side.is-small { width: min(78%, 15.5rem); }
+}
+@media (prefers-reduced-motion: reduce) { .bs-miss.is-new, .bs-hit.is-new, .bs-hit.is-new::after { animation: none; } .bs-hit.is-new::after { display: none; } }

@@ -1,0 +1,27 @@
+.pig-race { display: grid; gap: 0.4rem; width: min(100%, 28rem); margin: 0; padding: 0; list-style: none; }
+.pig-race li { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 0.35rem 0.75rem; padding: 0.55rem 0.8rem 0.65rem; border-radius: var(--r-medium); background: var(--s2); border: 1px solid transparent; transition: border-color var(--t-med), background-color var(--t-med); }
+.pig-race li.is-turn { border-color: color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 7%, var(--s2)); }
+.pig-race li.is-win { border-color: var(--c); }
+.pig-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; font-weight: 600; color: var(--paper-2); }
+.pig-score { font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+.pig-score small { color: var(--c); font-size: 0.85rem; font-weight: 650; }
+.pig-bar { position: relative; grid-column: 1 / -1; height: 6px; border-radius: 99px; background: var(--night); overflow: hidden; }
+.pig-bar i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 99px; transition: width var(--t-slow) var(--ease-out), left var(--t-slow) var(--ease-out); }
+.pig-fill { background: var(--c); }
+.pig-pend { background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--c) 55%, transparent) 0 4px, color-mix(in srgb, var(--c) 25%, transparent) 4px 8px); border-radius: 0 99px 99px 0 !important; }
+
+.pig-center { display: flex; align-items: center; justify-content: center; gap: clamp(1.25rem, 6cqw, 2.5rem); padding: 0.5rem 0; }
+.pig-center .g-die { --s: clamp(4.5rem, 3.5rem + 5cqw, 6rem); }
+.pig-blank { background: var(--s2); box-shadow: inset 0 0 0 2px var(--line-2); }
+.pig-center.is-bust .g-die { background: linear-gradient(160deg, #FFE1DD, #F2B3AC); color: #5A1A17; animation: pig-shake 0.45s var(--ease-out); }
+.pig-total { display: grid; gap: 0.1rem; min-width: 7rem; }
+.pig-label { color: var(--muted); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.pig-total b { font-size: clamp(2.6rem, 2rem + 3cqw, 3.4rem); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+.pig-center.is-bust .pig-total b { color: var(--error); }
+.pig-rolls { display: flex; flex-wrap: wrap; gap: 0.25rem; min-height: 1.5rem; max-width: 10rem; }
+.pig-rolls span { display: grid; place-items: center; min-width: 1.5rem; height: 1.5rem; padding: 0 0.3rem; border-radius: 6px; background: var(--night-3); font-size: 0.8rem; font-weight: 650; font-variant-numeric: tabular-nums; animation: g-pop 0.25s var(--ease-pop); }
+.pig-log { min-height: 1.4em; }
+.pig-actions .btn { min-width: 8.5rem; }
+@keyframes pig-shake { 20% { transform: translateX(-6px) rotate(-4deg); } 45% { transform: translateX(5px) rotate(3deg); } 70% { transform: translateX(-3px); } }
+@media (prefers-reduced-motion: reduce) { .pig-center.is-bust .g-die, .pig-rolls span { animation: none; } .pig-bar i { transition: none; } }
+.pig-center.is-bust .g-die.is-rolling { animation: g-roll 0.5s var(--ease-out), pig-shake 0.45s 0.5s var(--ease-out); }

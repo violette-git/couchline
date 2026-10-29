@@ -1,0 +1,41 @@
+/* Mancala: a long dark board with round wells. Each side's pits and store are ringed in that
+   player's color; seeds are neutral pebbles, with the count beside every well. */
+.g-mancala { gap: 0.85rem; }
+.mc-board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 6fr) minmax(0, 1fr); grid-template-rows: auto auto; gap: 0.35rem clamp(0.3rem, 1.4cqw, 0.8rem);
+  width: min(100%, 46rem); padding: clamp(0.5rem, 2cqw, 1rem); border-radius: clamp(1.5rem, 8cqw, 4.5rem); background: linear-gradient(180deg, #232733, #1A1D26);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), inset 0 0 0 1px #2C3140, 0 22px 44px -18px rgb(0 0 0 / 0.85); }
+.mc-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: clamp(0.25rem, 1.2cqw, 0.7rem); }
+.mc-row.is-far { grid-column: 2; grid-row: 1; }
+.mc-row.is-near { grid-column: 2; grid-row: 2; }
+.mc-board > .mc-store:first-child { grid-column: 1; grid-row: 1 / 3; }
+.mc-board > .mc-store:last-child { grid-column: 3; grid-row: 1 / 3; }
+
+.mc-pit { display: grid; justify-items: center; gap: 0.2rem; min-width: 0; padding: 0; border: 0; background: none; color: var(--paper); font: inherit; }
+.mc-row.is-far .mc-pit { grid-template-areas: "count" "well"; }
+.mc-row.is-near .mc-pit { grid-template-areas: "well" "count"; }
+.mc-well { grid-area: well; position: relative; width: 100%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 50% 38%, #0C0E13 0%, #12151C 70%, #191C25 100%);
+  box-shadow: inset 0 3px 8px rgb(0 0 0 / 0.7), 0 1px 0 rgb(255 255 255 / 0.05), 0 0 0 1.5px color-mix(in srgb, var(--c) 30%, transparent); transition: box-shadow var(--t-med), transform var(--t-fast) var(--ease-out); }
+.mc-count { grid-area: count; font-size: clamp(0.8rem, 0.6rem + 1cqw, 1.05rem); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--paper-2); line-height: 1.2; }
+button.mc-pit { cursor: pointer; }
+button.mc-pit .mc-well { box-shadow: inset 0 3px 8px rgb(0 0 0 / 0.7), 0 0 0 2px var(--c); }
+button.mc-pit:hover .mc-well { box-shadow: inset 0 3px 8px rgb(0 0 0 / 0.7), 0 0 0 2px var(--c), 0 0 16px -2px var(--c); }
+button.mc-pit:active .mc-well { transform: scale(0.95); }
+button.mc-pit .mc-count { color: var(--paper); }
+.mc-pit.is-hot .mc-well { box-shadow: inset 0 3px 8px rgb(0 0 0 / 0.7), 0 0 0 2px var(--paper); }
+.mc-pit.is-from .mc-well { box-shadow: inset 0 3px 8px rgb(0 0 0 / 0.7), 0 0 0 1.5px color-mix(in srgb, var(--c) 30%, transparent), 0 0 0 4px rgb(243 244 247 / 0.12); }
+.mc-pit.is-taken .mc-well { animation: mc-taken 0.9s var(--ease-out); }
+@keyframes mc-taken { 0% { box-shadow: inset 0 3px 8px rgb(0 0 0 / 0.7), 0 0 0 3px var(--error); } 100% { box-shadow: inset 0 3px 8px rgb(0 0 0 / 0.7), 0 0 0 1.5px transparent; } }
+
+.mc-seeds { position: absolute; inset: 12%; }
+.mc-seeds i { position: absolute; width: 19%; aspect-ratio: 1; margin: -9.5% 0 0 -9.5%; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0%, hsl(36 18% var(--l, 70%)) 45%, hsl(30 14% calc(var(--l, 70%) - 28%)) 100%); box-shadow: 0 1px 1.5px rgb(0 0 0 / 0.6); }
+
+.mc-store { position: relative; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: center; min-width: 0; padding: 0.5rem 0.2rem; border-radius: 999px;
+  background: radial-gradient(circle at 50% 40%, #0C0E13 0%, #13161D 80%); box-shadow: inset 0 3px 10px rgb(0 0 0 / 0.75), 0 0 0 2px color-mix(in srgb, var(--c) 55%, transparent); }
+.mc-store.is-hot { box-shadow: inset 0 3px 10px rgb(0 0 0 / 0.75), 0 0 0 2px var(--paper); }
+.mc-store-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(0.62rem, 0.5rem + 0.6cqw, 0.78rem); font-weight: 650; color: var(--c); }
+.mc-store-count { grid-row: 3; font-size: clamp(1.1rem, 0.8rem + 2cqw, 1.8rem); font-weight: 750; font-variant-numeric: tabular-nums; }
+.mc-store .mc-seeds { inset: 30% 18%; }
+.mc-store .mc-seeds i { width: 22%; margin: -11% 0 0 -11%; }
+.mc-note { min-height: 1.4em; }
+@media (prefers-reduced-motion: reduce) { .mc-pit.is-taken .mc-well { animation: none; } }

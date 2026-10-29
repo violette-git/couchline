@@ -1,0 +1,34 @@
+/* Checkers: a slate board with pale squares, pieces in their player's color with a turned rim. */
+.g-checkers { gap: 0.85rem; }
+.ck-scores { display: flex; justify-content: center; width: min(100%, 34rem); }
+.ck-scores .g-scoreboard { grid-template-columns: 1fr 1fr; width: 100%; }
+.ck-scores .g-scoreboard b { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.ck-board { --cols: 8; --gap: 0px; --size: 34rem; padding: 0; overflow: hidden; border-radius: 10px; box-shadow: 0 0 0 1px #000, 0 0 0 7px #232733, 0 0 0 8px #2E3341, 0 22px 40px -16px rgb(0 0 0 / 0.85);
+  width: min(100% - 16px, var(--size), calc((78svh - 11rem))); }
+.ck-sq { border-radius: 0; }
+.ck-sq.is-light { background: #A9AEBA; }
+.ck-sq.is-dark { background: #2C303B; }
+button.ck-sq:not(:disabled):hover { background: #353A47; }
+button.ck-sq:not(:disabled):active { transform: none; }
+.ck-sq:not(:disabled) { cursor: pointer; }
+.ck-sq.is-path { background: #3B3F33; }
+.ck-sq.is-path::before { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 2px rgb(214 178 64 / 0.35); }
+.ck-sq.is-sel { background: #3D4352; }
+.ck-sq.is-dest::after { content: ''; width: 28%; aspect-ratio: 1; border-radius: 50%; background: rgb(243 244 247 / 0.28); }
+button.ck-sq.is-dest:hover::after { width: 76%; background: rgb(243 244 247 / 0.12); box-shadow: inset 0 0 0 2px rgb(243 244 247 / 0.35); }
+
+/* A piece: a disc with a turned rim, raised a little. */
+.ck-piece { position: absolute; inset: 11%; display: grid; place-items: center; border-radius: 50%; color: color-mix(in srgb, var(--c) 35%, #000);
+  background: radial-gradient(circle at 50% 50%, var(--c) 0 40%, color-mix(in srgb, var(--c) 78%, #000) 41% 44%, var(--c) 45% 58%, color-mix(in srgb, var(--c) 78%, #000) 59% 62%, var(--c) 63%);
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--c) 60%, #000), inset 0 2px 0 color-mix(in srgb, var(--c) 60%, #fff), 0 4px 7px rgb(0 0 0 / 0.5);
+  transition: transform var(--t-med) var(--ease-pop); }
+.ck-piece svg { width: 56%; height: 56%; fill: color-mix(in srgb, var(--c) 12%, #fff); stroke: color-mix(in srgb, var(--c) 35%, #000); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.25)); }
+.ck-piece.is-king { background: radial-gradient(circle at 50% 50%, var(--c) 0 58%, color-mix(in srgb, var(--c) 78%, #000) 59% 62%, var(--c) 63%); }
+.ck-sq.is-sel .ck-piece { transform: translateY(-3px) scale(1.06); box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--c) 60%, #000), inset 0 2px 0 color-mix(in srgb, var(--c) 60%, #fff), 0 0 0 3px var(--paper), 0 8px 14px rgb(0 0 0 / 0.55); }
+.ck-sq.is-can .ck-piece { box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--c) 60%, #000), inset 0 2px 0 color-mix(in srgb, var(--c) 60%, #fff), 0 0 0 2px rgb(243 244 247 / 0.35), 0 4px 7px rgb(0 0 0 / 0.5); }
+.ck-sq.is-must .ck-piece { animation: ck-must 1.4s ease-in-out infinite; }
+.ck-ghost { pointer-events: none; animation: ck-gone 0.5s var(--ease-out) forwards; }
+@keyframes ck-gone { from { opacity: 0.9; transform: scale(1); } to { opacity: 0; transform: scale(0.6); } }
+@keyframes ck-must { 0%, 100% { box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--c) 60%, #000), 0 0 0 2px rgb(243 244 247 / 0.2), 0 4px 7px rgb(0 0 0 / 0.5); } 50% { box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--c) 60%, #000), 0 0 0 4px rgb(243 244 247 / 0.7), 0 4px 7px rgb(0 0 0 / 0.5); } }
+.ck-note { min-height: 1.4em; }
+@media (prefers-reduced-motion: reduce) { .ck-sq.is-must .ck-piece, .ck-ghost { animation: none; } .ck-ghost { display: none; } }

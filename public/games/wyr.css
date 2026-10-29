@@ -1,0 +1,44 @@
+.wy-wrap { display: grid; justify-items: center; gap: 0.9rem; width: min(100%, 46rem); }
+.wy-head { margin: 0; color: var(--faint); font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.wy-ask { margin: 0; font-size: clamp(1.3rem, 1rem + 1.6cqw, 1.8rem); font-weight: 750; letter-spacing: -0.02em; }
+.wy-sides { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: 0.6rem; width: 100%; }
+.wy-or { align-self: center; color: var(--faint); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.wy-side { position: relative; display: grid; align-content: start; justify-items: center; gap: 0.6rem; min-height: 9.5rem; padding: 1.1rem 1rem 1rem; overflow: hidden; border-radius: var(--r-large);
+  border: 1px solid var(--line-2); background: var(--s2); color: var(--paper); text-align: center; font: inherit; isolation: isolate;
+  transition: background-color var(--t-fast), border-color var(--t-fast), transform var(--t-fast) var(--ease-out), opacity var(--t-med); }
+.wy-side.is-new { animation: rise-in 0.4s var(--ease-out) backwards; }
+.wy-side.is-b.is-new { animation-delay: 70ms; }
+.wy-side:not(:disabled):hover { background: #20242E; border-color: var(--line-4); }
+.wy-side:not(:disabled):active { transform: scale(0.98); }
+.wy-side:disabled { cursor: default; }
+.wy-side.is-picked { border-color: var(--paper); background: #232835; }
+/* The split fills each side from the bottom. */
+.wy-side.is-win, .wy-side.is-lose, .wy-side.is-even { --fill: rgb(243 244 247 / 0.07); }
+.wy-side.is-win::before, .wy-side.is-lose::before, .wy-side.is-even::before { content: ''; position: absolute; inset: auto 0 0; height: var(--pct, 0%); background: var(--fill); z-index: -1; animation: wy-fill 0.6s var(--ease-out) backwards; }
+.wy-side.is-win { border-color: #4CC38A; --fill: rgb(76 195 138 / 0.16); }
+.wy-side.is-lose { opacity: 0.7; }
+.wy-letter { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 9px; background: var(--night-3); color: var(--paper-2); font-family: var(--mono); font-weight: 700; font-size: 0.85rem; }
+.wy-side.is-picked .wy-letter { background: var(--paper); color: var(--night); }
+.wy-text { font-size: clamp(1.02rem, 0.9rem + 0.8cqw, 1.3rem); font-weight: 650; line-height: 1.3; text-wrap: balance; }
+.wy-mine { color: var(--paper-2); font-size: 0.8rem; font-weight: 600; }
+.wy-result { display: grid; justify-items: center; gap: 0.45rem; }
+.wy-pct { font-size: 1.6rem; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.wy-people { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.3rem; }
+.wy-person { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.5rem 0.15rem 0.4rem; border-radius: 999px; background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--paper); font-size: 0.78rem; font-weight: 600; animation: g-pop 0.3s var(--ease-pop) backwards; }
+.wy-person .dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--c); }
+.wy-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem; margin: 0; min-height: 1.6rem; color: var(--muted); font-size: 0.95rem; text-align: center; }
+.wy-line b { color: var(--paper-2); }
+.wy-line .g-who { display: inline-flex; gap: 4px; }
+.wy-line.is-got b { color: #8FE3BD; }
+.wy-scores { display: grid; justify-items: center; width: 100%; padding-top: 0.25rem; }
+@container (max-width: 520px) {
+  .wy-sides { grid-template-columns: minmax(0, 1fr); gap: 0.4rem; }
+  .wy-side { min-height: 0; grid-template-columns: auto 1fr; justify-items: start; align-items: center; text-align: left; padding: 0.85rem 0.9rem; column-gap: 0.75rem; }
+  .wy-result, .wy-mine { grid-column: 1 / -1; justify-items: start; }
+  .wy-people { justify-content: flex-start; }
+  .wy-or { justify-self: center; }
+}
+@keyframes wy-fill { from { height: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .wy-side.is-new, .wy-side::before, .wy-person { animation: none !important; }
+}

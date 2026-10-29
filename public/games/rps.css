@@ -1,0 +1,11 @@
+.rps-reveal { display: flex; justify-content: center; gap: clamp(1rem, 6cqw, 3rem); animation: rise-in 0.35s var(--ease-out); }
+.rps-side { display: grid; justify-items: center; gap: 0.3rem; padding: 1rem 1.25rem; min-width: 7.5rem; border-radius: var(--r-large); background: var(--s2); border: 2px solid transparent; }
+.rps-side .rps-glyph { font-size: clamp(2.6rem, 2rem + 4cqw, 4rem); line-height: 1; }
+.rps-side:last-child .rps-glyph { transform: scaleX(-1); }
+.rps-side.is-win { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, var(--s2)); }
+.rps-side.is-lose { opacity: 0.55; }
+.rps-name { font-weight: 650; color: var(--c); }
+.rps-wait { color: var(--muted); }
+.rps-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 30rem); }
+.rps-choice { flex-direction: column; justify-content: center; gap: 0.25rem; text-align: center; padding: 0.9rem 0.5rem; }
+.rps-choice .rps-glyph { font-size: 2rem; line-height: 1; }

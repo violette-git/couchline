@@ -16,8 +16,8 @@ Watch together from different places, on computers and phones (and a TV browser 
 
 ## Rooms: names, private, and public
 
-- **Start a room** asks for an optional name and who can join. **Private** (the default) means only people with the code or link get in, and it never shows up anywhere. **Public** means it's listed in **Browse public rooms** (`/rooms`) while someone is in it, and anyone can join.
-- The person who starts a room is its **host** and changes its name and privacy from the room menu. If the host is away, whoever has been in the room longest stands in; the host gets it back on return.
+- **Start a room** asks what it's for (watching, or games), an optional name, and who can join. **Private** (the default) means only people with the code or link get in, and it never shows up anywhere. **Public** means it's listed in **Browse public rooms** (`/rooms`) while someone is in it, and anyone can join.
+- The person who starts a room is its **host** and changes its name, privacy, and whether it's for watching or games from the room menu. If the host is away, whoever has been in the room longest stands in; the host gets it back on return.
 - Browse public rooms shows live rooms, busiest first, with what's on and who's there, and searches room names, what's playing, and codes.
 - Trying lots of different room codes from one address is cut off after 30 in 10 minutes, so private rooms can't be found by guessing.
 
@@ -54,6 +54,24 @@ The free quota allows about 100 searches a day; results are cached for 10 minute
 - **Instagram and TikTok follow:** on a computer with the extension, tap Share my scrolling on Instagram or TikTok, and as you move from reel to reel, the room sees the same one in Couchline (on any device). Phones can't run extensions, so from a phone, share reels one at a time with the share sheet.
 - **Your camera:** your own picture is mirrored like a mirror (only on your screen). Turn it off under Camera and mic.
 
+## Games
+
+The **Games** tab has 27 games everyone in the room plays together. Rooms don't have to be about the video: start one for **Games** (or switch it from the room menu, as the host) and it opens to a game picker on the main screen, with the chat beside it, and comes back to the picker whenever a game closes. **Start a game night** on the home page does this in one step. You can still put a video on in a games room. Pick one and it opens for everyone where the video plays (the video pauses); people tap Join to take a seat, and anyone seated taps Start. The call, chat, and reactions stay on while you play.
+
+| Kind | Games |
+| --- | --- |
+| Board | Tic-tac-toe, Connect Four, Checkers, Chess, Othello, Five in a Row, Mancala, Battleship, Dots and Boxes |
+| Word | Hangman, Wordle, Word Scramble, Pictionary |
+| Party | Trivia, Emoji Movies, Would You Rather, Rock Paper Scissors, Fastest Finger |
+| Cards and dice | Yahtzee, Pig, Snakes and Ladders, Blackjack, Crazy Eights, Memory |
+| Puzzles together | Sudoku, Minesweeper, Mastermind |
+
+- The server is the referee. It checks every move and sends each person only what they may see, so a hidden word, a hand of cards, or a fleet never reaches anyone else's browser.
+- People in the room who aren't playing watch. Games marked for it (the word, party, and puzzle games) take players who join mid-game.
+- When a game ends: Play again (whoever went first goes last), Change players, or pick another. Wins are counted in the Games tab for as long as the room lasts.
+- Search the tab by name or by another name for it (Connect 4, Reversi, Noughts and Crosses, Kalah, Concentration, and so on).
+- To add a game, see [games/README.md](games/README.md).
+
 Up next has three ways to add something (paste a link, pick a file, type a show), and every source is listed under the link box with how to get its link.
 
 The room code is in the top bar: tap it to copy the code or link, join another room, or leave. The empty room shows the code big, and the home page has a box to type one (or paste a whole room link).
@@ -69,7 +87,7 @@ npm start
 
 Open http://localhost:3000. To test with a phone on the same Wi-Fi, use your computer's local IP. Note that phones only allow the camera and mic on **https**, so the call needs a real deploy (below) or a tunnel such as `npx localtunnel --port 3000`.
 
-`npm test` checks link parsing, house rules (including no em dashes), the extension's packaged files, and runs fake viewers against the server for the web app, the new sources, and the extension.
+`npm test` checks link parsing, house rules (including no em dashes), the extension's packaged files, and runs fake viewers against the server for the web app, the new sources, the extension, and games (plus each game's rules).
 
 ## Deploy to Heroku
 
@@ -136,6 +154,7 @@ heroku config:set TURN_URLS=turn:host:3478,turns:host:5349 TURN_USERNAME=... TUR
 - One server instance only. Running several would need Redis for shared room state.
 - The call connects everyone to everyone, so it shows up to 5 cameras. People who join after that are on audio (shown as their name) and get a "Turn camera on" button when a camera spot opens. Rooms themselves have no size limit, and everything else (sync, chat, the queue) works for any number of people.
 - There are 8 person colors; a ninth person shares a color with someone.
+- Games live in server memory with the room. A server restart ends a game in progress; wins so far are lost too.
 
 ## Credits
 

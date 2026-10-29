@@ -1,0 +1,6 @@
+.ttt-board { --cols: 3; --gap: 8px; --size: 24rem; }
+.ttt-board .g-cell { border-radius: 14px; }
+.ttt-mark { width: 72%; height: 72%; fill: none; stroke: var(--c); stroke-width: 11; stroke-linecap: round; }
+.ttt-mark.is-new path, .ttt-mark.is-new circle { stroke-dasharray: 200; stroke-dashoffset: 200; animation: ttt-draw 0.38s var(--ease-out) forwards; }
+@keyframes ttt-draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .ttt-mark.is-new path, .ttt-mark.is-new circle { animation: none; stroke-dashoffset: 0; } }

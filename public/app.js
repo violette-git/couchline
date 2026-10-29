@@ -14,6 +14,7 @@ import { $, el, store, colorOf, toast, listNames } from './ui.js';
 import { initSocial } from './social.js';
 import { initAdding, handleShareLanding } from './adding.js';
 import { initCreate, initBrowse, pendingRoom } from './rooms.js';
+import { initGames, renderShelf } from './games.js';
 
 const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
 const WORDS_A = ['maple', 'velvet', 'quiet', 'amber', 'cozy', 'late', 'lucky', 'sunny', 'hazel', 'cobalt'];
@@ -48,7 +49,7 @@ if (handleShareLanding()) {
 } else if (routeMatch) {
   roomId = routeMatch[1].toLowerCase();
   $('#entryRoom').textContent = roomId;
-  for (const id of ['#roomCodeTop', '#roomMenuCode', '#emptyCode']) $(id).textContent = roomId;
+  for (const id of ['#roomCodeTop', '#roomMenuCode', '#emptyCode', '#pickCode']) $(id).textContent = roomId;
   // The extension page shows this room's code, and links back here.
   for (const a of document.querySelectorAll('.ext-room-link')) a.href = `/extension?room=${roomId}`;
   $('#name').value = store.get('name', '');
@@ -70,6 +71,7 @@ if (handleShareLanding()) {
   }
 } else {
   show('landing');
+  renderShelf($('#gameShelf'));
 }
 
 initCreate({ newRoomCode });
@@ -125,7 +127,7 @@ const inBox = (it) => IN_BOX.includes(it?.kind);
 const isLive = (it) => !!it?.live || (!!it && player?.key === it.id && player.live);
 
 // ---------- room ----------
-let socket, clock, call, share, social, adding, swipe, popout;
+let socket, clock, call, share, social, adding, swipe, popout, games;
 let room = null;
 let me = { remote: false };
 let lastItemId = null;
@@ -167,6 +169,7 @@ function enterRoom(opts) {
   swipe = initSwipe({ socket, getRoom: () => room });
   popout = initPopout({ call, getRoom: () => room, onChange: () => renderCallButtons() });
   social = initSocial({ socket, clientId, getRoom: () => room, expectedNow, durationNow, isLive, thumbUrl });
+  games = initGames({ socket, clientId, getRoom: () => room, now: () => clock.now() });
   if (opts.call) startCall(); // inside the tap, so iOS allows camera and audio
 
   socket.on('connect', () => {
@@ -193,6 +196,8 @@ function enterRoom(opts) {
   socket.on('typing', (t) => social.onTyping(t));
   socket.on('ping', (p) => social.onPing(p));
   socket.on('go', onGo);
+  socket.on('game', (g) => games.onGame(g));
+  socket.on('game:relay', (r) => games.onRelay(r));
   // The call and file sharing use the same relay; file messages are marked "share".
   socket.on('signal', (d) => (d.msg?.share ? share.handleSignal(d) : call.handleSignal(d)));
 
@@ -203,7 +208,7 @@ function enterRoom(opts) {
 // A saved copy of the room, so it comes back if the server restarts.
 function saveCache() {
   if (!room) return;
-  store.set(`room:${roomId}`, { title: room.title, visibility: room.visibility, current: room.current, queue: room.queue, played: room.played, shows: room.shows, history: room.history, chat: social.messages().slice(-100) });
+  store.set(`room:${roomId}`, { title: room.title, visibility: room.visibility, mode: room.mode, current: room.current, queue: room.queue, played: room.played, shows: room.shows, history: room.history, chat: social.messages().slice(-100) });
 }
 
 function onState(s) {
@@ -217,6 +222,7 @@ function onState(s) {
   renderRoomSettings();
   social.onState(s);
   swipe.render(s);
+  games.render(s);
   renderCallButtons();
   call.sync(s.members);
   tick();
@@ -245,7 +251,7 @@ function renderRoomSettings() {
   $('#roomChip').classList.toggle('has-title', !!room.title);
   document.title = room.title ? `${room.title} on Couchline` : 'Couchline';
   // Only rewrite the name box when the name itself changes, so typing isn't interrupted.
-  const key = `${room.title}|${room.visibility}|${isHost}`;
+  const key = `${room.title}|${room.visibility}|${room.mode}|${isHost}`;
   if (key !== settingsKey) {
     settingsKey = key;
     if (document.activeElement !== $('#roomTitleInput')) $('#roomTitleInput').value = room.title || '';
@@ -256,6 +262,10 @@ function renderRoomSettings() {
     b.setAttribute('aria-pressed', String(b.dataset.roomVisibility === room.visibility));
     b.disabled = !isHost;
   }
+  for (const b of document.querySelectorAll('[data-room-mode]')) {
+    b.setAttribute('aria-pressed', String(b.dataset.roomMode === room.mode));
+    b.disabled = !isHost;
+  }
   const what = room.visibility === 'public'
     ? 'Public: listed in Browse rooms while someone is here. Anyone can join.'
     : 'Private: only people with the code or link can join.';
@@ -264,13 +274,16 @@ function renderRoomSettings() {
   const pending = pendingRoom.get(roomId);
   if (pending && isHost) {
     pendingRoom.clear();
-    if (pending.title || pending.visibility === 'public') socket.emit('room:settings', { title: pending.title, visibility: pending.visibility }, () => {});
+    if (pending.title || pending.visibility === 'public' || pending.mode === 'games') socket.emit('room:settings', { title: pending.title, visibility: pending.visibility, mode: pending.mode }, () => {});
   }
 }
 $('#roomSettings').addEventListener('submit', (e) => {
   e.preventDefault();
   socket.emit('room:settings', { title: $('#roomTitleInput').value }, (r) => { if (r?.error) toast({ text: r.error }); });
 });
+for (const b of document.querySelectorAll('[data-room-mode]')) {
+  b.addEventListener('click', () => socket.emit('room:settings', { mode: b.dataset.roomMode }, (r) => { if (r?.error) toast({ text: r.error }); }));
+}
 for (const b of document.querySelectorAll('[data-room-visibility]')) {
   b.addEventListener('click', () => socket.emit('room:settings', { visibility: b.dataset.roomVisibility }, (r) => { if (r?.error) toast({ text: r.error }); }));
 }
@@ -642,7 +655,7 @@ $('#scrub').addEventListener('change', (e) => {
 $('#startTogether').addEventListener('click', () => socket.emit('countdown:start', { seconds: 5 }));
 $('#cancelCountdown').addEventListener('click', () => socket.emit('countdown:cancel'));
 document.addEventListener('keydown', (e) => {
-  if (!room || e.target.closest('input, select, textarea, button')) return;
+  if (!room || games?.active || e.target.closest('input, select, textarea, button')) return;
   if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
   if (e.code === 'ArrowLeft') seekBy(-10);
   if (e.code === 'ArrowRight') seekBy(10);
