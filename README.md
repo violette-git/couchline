@@ -42,11 +42,13 @@ The free quota allows about 100 searches a day; results are cached for 10 minute
 ## Together
 
 - **Chat:** a Chat tab with a box right under the video, typing indicators, and an unread count. Messages float over the video when the chat isn't open, and in full screen. A message sent mid-video has an "at 12:03" link that takes everyone back there.
+- **Message sounds:** a soft note when someone else sends a message, and a brighter one when it names you (with or without an @). They play in a background tab too, so you hear them while you're in Netflix or another app's tab, and a burst of messages makes one sound. Turn them off in the room menu (just for you, remembered on that device).
 - **Point:** press and hold on the video to ping that spot on everyone's screen, in your color.
 - **Moments:** the star button marks a moment on everyone's timeline. Tap a mark to go there; right click to remove it.
 - **Ready check:** everyone taps I'm ready, and when the last person does, the countdown starts by itself.
 - **Rate it together:** when something you watched ends, you each rate it; the scores reveal at the same time and go into the Watched tab.
 - **Played:** everything that was on stays at the bottom of Up next, newest first, with Play again and Add back. Files from your device too.
+- **Reactions:** 40 of them in a row under the video that scrolls sideways (a mouse wheel scrolls it too), with the six favorites first.
 - **Jinx:** send the same reaction at the same moment and it bursts.
 - **Stepped away:** the roster shows who has switched away from Couchline. Turn on "Pause when someone steps away" in the room menu to pause after 8 seconds.
 - **Swipe together:** a deck of Instagram reels and TikToks everyone swipes through as one. Whoever swipes is driving and everyone's screen follows. Reels and TikToks already in Up next move into the deck, and anything shared while it's on (phone share sheet, Paste, chat) joins it. Each person taps the video to play it.
@@ -67,10 +69,12 @@ The **Games** tab has 27 games everyone in the room plays together. Rooms don't 
 | Puzzles together | Sudoku, Minesweeper, Mastermind |
 
 - The server is the referee. It checks every move and sends each person only what they may see, so a hidden word, a hand of cards, or a fleet never reaches anyone else's browser.
+- **A video during a game:** tap **Video** in the game's bar to paste a link (or show what's already on). It plays for everyone, in sync, in a small window over the game. Each person drags it anywhere on their own screen and resizes it from the corner (double-click its bar to put it back); the spot is remembered on that device. A video showing this way keeps playing when the next game opens. Hiding it (the ✕) hides and pauses it for everyone.
+- **Sounds:** soft taps on every button press in a game, a thud when a move isn't allowed, a chime when it's your turn, little tunes to start and finish, and ticks in a timer's last three seconds. They're made in the browser (no sound files). The speaker button in the game's bar turns them off, remembered on that device.
 - People in the room who aren't playing watch. Games marked for it (the word, party, and puzzle games) take players who join mid-game.
 - When a game ends: Play again (whoever went first goes last), Change players, or pick another. Wins are counted in the Games tab for as long as the room lasts.
 - Search the tab by name or by another name for it (Connect 4, Reversi, Noughts and Crosses, Kalah, Concentration, and so on).
-- Hangman's word comes from Couchline (pick a topic in the lobby) or from the first player, who types the word and a topic for everyone to see as a clue.
+- Hangman gives eight misses. The word comes from Couchline (pick a topic in the lobby) or from the first player, who types the word, a topic everyone sees, and optionally a hint. Once a game, anyone guessing can open the hint (with Couchline's words, it shows a letter). Curly apostrophes and long dashes from phone keyboards work like ' and -. The person who chose the word sees all of it, with letters already found in the color of whoever found them and the rest dim.
 - To add a game, see [games/README.md](games/README.md).
 
 Up next has three ways to add something (paste a link, pick a file, type a show), and every source is listed under the link box with how to get its link.

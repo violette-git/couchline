@@ -214,3 +214,45 @@ button.g-card:disabled { cursor: default; }
 @media (max-width: 420px) { .game-pick .g-grid { grid-template-columns: 1fr 1fr; } }
 @media (prefers-reduced-motion: reduce) { .game-pick-head, .game-pick-group { animation: none; } }
 .game-pick .empty-code strong { display: inline; margin-left: 0.5rem; font-size: 1rem; letter-spacing: 0; }
+
+/* ---------- a video over the game ---------- */
+.game-video-panel { display: grid; gap: 0.55rem; padding: 0.75rem 0.9rem 0.85rem; border-bottom: 1px solid var(--line); background: var(--night-2); animation: rise-in 0.3s var(--ease-out) backwards; }
+.g-video-form { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.g-video-form input { flex: 1 1 14rem; min-width: 0; min-height: 44px; padding: 0 0.9rem; border-radius: 10px; border: 1px solid var(--line-2); background: var(--night); color: var(--paper); font-size: 1rem; }
+.g-video-form input:focus { outline: none; border-color: var(--paper-2); }
+.game-video-panel .error { margin: 0; }
+#gameVideoBtn.is-on { border-color: var(--paper-2); color: var(--paper); }
+#gameVideoBtn.is-on::before { content: ''; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--mint); }
+
+/* The player's own box floats while a game is open. It isn't clipped by the stage, so the
+   stage gives up clipping (and its container) to the game while that's on. */
+.pip-bar, .pip-resize { display: none; }
+.stage.has-float { container-type: normal; overflow: visible; }
+.stage.has-float > .game-wrap { container-type: inline-size; border-radius: inherit; overflow: clip; }
+.stage.is-gaming.has-float > #playerWrap {
+  display: grid !important; grid-template-rows: 34px auto; position: fixed; inset: auto; left: var(--pip-x, auto); top: var(--pip-y, auto);
+  width: var(--pip-w, 340px); height: auto; z-index: 15; border-radius: 14px; overflow: hidden; background: #000;
+  box-shadow: 0 0 0 1px var(--line-2), var(--shadow-3); animation: pip-in 0.35s var(--ease-pop) backwards;
+}
+@keyframes pip-in { from { opacity: 0; transform: scale(0.9) translateY(12px); } to { opacity: 1; transform: none; } }
+.stage.has-float #playerSlot { position: relative; inset: auto; height: auto; aspect-ratio: 16 / 9; }
+.stage.has-float #tapShield { top: 34px; }
+.stage.has-float .tap-banner { top: calc(34px + 0.5rem); font-size: 0.8rem; }
+.stage.has-float .player-note { left: 0.5rem; right: 0.5rem; bottom: 0.5rem; font-size: 0.8rem; }
+.stage.has-float .pip-bar { display: flex; align-items: center; gap: 0.35rem; height: 34px; padding: 0 0.25rem 0 0.4rem; background: var(--night-3); border-bottom: 1px solid var(--line-2); cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; }
+.stage.has-float .is-moving .pip-bar, #playerWrap.is-moving .pip-bar { cursor: grabbing; }
+#playerWrap.is-moving #playerSlot { pointer-events: none; }
+.pip-grip { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--faint); stroke-width: 3.2; stroke-linecap: round; }
+.pip-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; font-weight: 600; color: var(--paper-2); }
+.pip-btn { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 0.85rem; }
+.pip-btn:hover { background: rgb(255 255 255 / 0.08); color: var(--paper); }
+.stage.has-float .pip-resize { display: block; position: absolute; right: 0; bottom: 0; z-index: 3; width: 24px; height: 24px; cursor: nwse-resize; touch-action: none;
+  background: linear-gradient(135deg, transparent 52%, rgb(243 244 247 / 0.65) 52% 58%, transparent 58% 68%, rgb(243 244 247 / 0.65) 68% 74%, transparent 74%); }
+@media (prefers-reduced-motion: reduce) { .stage.is-gaming.has-float > #playerWrap, .game-video-panel { animation: none; } }
+
+/* The game sounds switch, in the game bar. */
+.g-sound { padding-inline: 0.55rem; }
+.g-sound svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.g-sound .g-sound-off, .g-sound.is-muted .g-sound-on { display: none; }
+.g-sound.is-muted .g-sound-off { display: inline; }
+.g-sound.is-muted { color: var(--faint); }

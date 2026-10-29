@@ -79,7 +79,7 @@ export const CATALOG = [
   {
     id: 'hangman', name: 'Hangman', aka: ['guess the word'], category: 'word', min: 1, max: 8, coop: true, lateJoin: true,
     blurb: 'Guess the word together.',
-    rules: 'Everyone guesses letters (or the whole word) together. Each wrong guess adds to the drawing; six and the word wins. Pick who chooses the word: Couchline, or the first player, who also names its topic as a clue and then sits out guessing.',
+    rules: 'Everyone guesses letters (or the whole word) together. Each wrong guess adds to the drawing; eight and the word wins. Pick who chooses the word: Couchline, or the first player, who also names its topic, can leave a hint, and then sits out guessing. Once a game, anyone can open the hint (with Couchline’s words, it shows a letter).',
     options: [
       { key: 'from', label: 'The word comes from', choices: [{ value: 'random', label: 'Couchline' }, { value: 'player', label: 'First player' }] },
       { key: 'topic', label: 'Topic', when: { from: 'random' }, choices: [{ value: 'mixed', label: 'Mixed' }, { value: 'movies', label: 'Movies and TV' }, { value: 'animals', label: 'Animals' }, { value: 'food', label: 'Food' }] },
