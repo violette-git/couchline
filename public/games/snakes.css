@@ -1,0 +1,47 @@
+.sn-wrap { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 1.25rem 2rem; width: 100%; }
+.sn-board { position: relative; width: min(100%, 30rem, calc((78svh - 6rem) * 10 / 11)); aspect-ratio: 10 / 11; }
+.sn-grid { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: 1; display: grid; grid-template: repeat(10, 1fr) / repeat(10, 1fr); border-radius: var(--r-medium); overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow-2); }
+.sn-sq { position: relative; background: #161A23; }
+.sn-sq.is-alt { background: #1C212C; }
+.sn-sq.is-goal { background: linear-gradient(135deg, #2C2A1E, #1F1D16); }
+.sn-num { position: absolute; left: 4px; top: 2px; color: #5E6577; font-family: var(--mono); font-size: clamp(0.5rem, 1.6cqw, 0.66rem); line-height: 1.2; }
+.sn-sq.is-goal .sn-num { color: var(--paper-2); font-weight: 700; }
+.sn-art { position: absolute; left: 0; top: 0; width: 100%; height: auto; aspect-ratio: 1; overflow: visible; pointer-events: none; }
+.sn-tray { position: absolute; left: 0; right: 0; bottom: 0; height: calc(100% / 11 - 6px); display: flex; align-items: center; justify-content: flex-end; padding-right: 0.75rem; border-radius: 10px; border: 1px dashed var(--line-2); }
+.sn-tray span { color: var(--faint); font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* Ladders in warm wood, snakes in muted greens and slates: scenery, never anyone's color. */
+.sn-rail { fill: none; stroke: #9A8463; stroke-width: 7; stroke-linecap: round; }
+.sn-rung { fill: none; stroke: #6F5F48; stroke-width: 6; stroke-linecap: round; }
+.sn-ladder { filter: drop-shadow(0 3px 3px rgb(0 0 0 / 0.5)); }
+.sn-body { fill: none; stroke: var(--snake); stroke-width: 15; stroke-linecap: round; stroke-linejoin: round; }
+.sn-scales { fill: none; stroke: var(--snake-2); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 2 12; }
+.sn-head { fill: var(--snake); }
+.sn-eye { fill: #0E1015; }
+.sn-snake { filter: drop-shadow(0 3px 3px rgb(0 0 0 / 0.5)); opacity: 0.92; }
+.sn-snake-0 { --snake: #4F7A5C; --snake-2: #7FA88A; }
+.sn-snake-1 { --snake: #56607E; --snake-2: #8792B5; }
+
+/* Tokens, in their player's color, gliding from square to square. */
+.sn-tokens { position: absolute; inset: 0; pointer-events: none; }
+.sn-token { position: absolute; display: grid; place-items: center; width: 6.4%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; color: #12141A; font-weight: 800; font-size: clamp(0.55rem, 2.2cqw, 0.85rem);
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 65%, #fff), var(--c) 55%, color-mix(in srgb, var(--c) 70%, #000));
+  box-shadow: 0 0 0 2px #0C0D12, 0 4px 8px rgb(0 0 0 / 0.55); transition: left var(--t-slow) var(--ease-out), top var(--t-slow) var(--ease-out); z-index: 1; }
+.sn-token.is-turn { z-index: 2; box-shadow: 0 0 0 2px #0C0D12, 0 0 0 4.5px var(--c), 0 4px 10px rgb(0 0 0 / 0.55); }
+
+.sn-panel { display: grid; justify-items: center; gap: 0.9rem; width: min(100%, 14.5rem); }
+.sn-controls { display: flex; align-items: center; gap: 1rem; min-height: 3.4rem; }
+.sn-die .g-die { --s: 3.2rem; }
+.sn-die.is-idle .g-die { opacity: 0.35; }
+.sn-roll { min-width: 7rem; min-height: 46px; font-size: 1.05rem; }
+.sn-said { margin: 0; min-height: 2.8em; color: var(--paper-2); font-size: 0.95rem; text-align: center; text-wrap: pretty; }
+.sn-said.is-big { color: var(--c); font-weight: 650; }
+.sn-panel .g-scoreboard { width: 100%; }
+
+@container (max-width: 560px) {
+  .sn-wrap { gap: 1rem; }
+  .sn-panel { width: 100%; }
+  .sn-panel .g-scoreboard { width: min(100%, 22rem); }
+}
+@media (prefers-reduced-motion: reduce) { .sn-token { transition: none; } }
