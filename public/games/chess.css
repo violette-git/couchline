@@ -1,0 +1,100 @@
+/* Chess: a calm walnut and cream board, white and black pieces outlined so both read on
+   either square, and a side column (on wide stages) with the players and the moves. */
+.ch-wrap { --light: #E4DBC9; --dark: #A3876A; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "board" "bottom" "actions" "moves";
+  gap: 0.6rem; width: min(100%, 34rem); }
+@container (min-width: 760px) {
+  .ch-wrap { width: min(100%, 52rem); grid-template-columns: minmax(0, 34rem) minmax(13rem, 16rem); grid-template-rows: auto 1fr auto auto;
+    grid-template-areas: "board top" "board moves" "board actions" "board bottom"; gap: 0.75rem 1.25rem; align-items: start; }
+  .ch-moves { align-self: stretch; }
+}
+.ch-top { grid-area: top; }
+.ch-bottom { grid-area: bottom; }
+.ch-boardbox { grid-area: board; position: relative; display: grid; place-items: center; min-width: 0; }
+.ch-actions { grid-area: actions; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
+.ch-actions[hidden], .ch-moves[hidden] { display: none; }
+
+/* The board. */
+.ch-board { --cols: 8; --gap: 0px; --size: 34rem; padding: 0; overflow: hidden; border-radius: 8px; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5), 0 18px 40px -16px rgb(0 0 0 / 0.8); }
+.ch-sq { border-radius: 0; container-type: size; }
+.ch-sq.is-light { background: var(--light); }
+.ch-sq.is-dark { background: var(--dark); }
+button.ch-sq:not(:disabled):hover { background: var(--light); }
+button.ch-sq.is-dark:not(:disabled):hover { background: var(--dark); }
+button.ch-sq:not(:disabled):active { transform: none; }
+.ch-sq:not(:disabled) { cursor: pointer; }
+.ch-sq.is-last::before, .ch-sq.is-sel::before { content: ''; position: absolute; inset: 0; background: rgb(214 178 64 / 0.42); }
+.ch-sq.is-sel::before { background: rgb(96 158 104 / 0.55); }
+.ch-sq.is-check { background: radial-gradient(circle, #FF5A4E 0%, #E2382E 30%, rgb(170 30 30 / 0) 72%), var(--light); }
+.ch-sq.is-dark.is-check { background: radial-gradient(circle, #FF5A4E 0%, #E2382E 30%, rgb(170 30 30 / 0) 72%), var(--dark); }
+.ch-sq.is-dest::after { content: ''; position: absolute; width: 30%; aspect-ratio: 1; border-radius: 50%; background: rgb(30 40 30 / 0.32); }
+.ch-sq.is-hit::after { content: ''; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 0.3rem rgb(30 40 30 / 0.35); }
+button.ch-sq.is-dest:hover::after { width: 100%; height: 100%; border-radius: 0; background: rgb(30 40 30 / 0.18); }
+
+/* Pieces: filled glyphs, white with a dark edge and black with a soft light edge. */
+.ch-piece { position: relative; z-index: 1; font-family: 'Noto Sans Symbols 2', 'Segoe UI Symbol', 'Apple Symbols', 'DejaVu Sans', sans-serif; font-size: 82cqh; line-height: 1;
+  user-select: none; pointer-events: none; font-variant-emoji: text; }
+.ch-sq .ch-piece { transform-origin: center; }
+.ch-piece.is-w { color: #FBFAF7; -webkit-text-stroke: 0.035em #1A1712; paint-order: stroke fill; filter: drop-shadow(0 2px 1.5px rgb(0 0 0 / 0.35)); }
+.ch-piece.is-b { color: #1C1D22; -webkit-text-stroke: 0.025em #5A5752; paint-order: stroke fill; filter: drop-shadow(0 2px 1.5px rgb(0 0 0 / 0.3)); }
+.ch-sq.is-sel .ch-piece { transform: scale(1.06); }
+
+/* Coordinates in the corners. */
+.ch-rank, .ch-file { position: absolute; z-index: 1; font-size: max(9px, 17cqh); font-weight: 700; line-height: 1; pointer-events: none; }
+.ch-rank { top: 5%; left: 6%; }
+.ch-file { bottom: 5%; right: 7%; }
+.ch-sq.is-light :is(.ch-rank, .ch-file) { color: var(--dark); }
+.ch-sq.is-dark :is(.ch-rank, .ch-file) { color: var(--light); }
+
+/* Players: name, side, what they've taken. */
+.ch-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.6rem; padding: 0.5rem 0.8rem; border-radius: var(--r-medium);
+  background: var(--s2); border: 1px solid #22262F; transition: border-color var(--t-med), background-color var(--t-med); min-height: 2.9rem; }
+.ch-card.is-turn { border-color: color-mix(in srgb, var(--c) 70%, transparent); background: color-mix(in srgb, var(--c) 7%, var(--s2)); }
+.ch-dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--c); }
+.ch-card.is-turn .ch-dot { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 28%, transparent); animation: breathe 2.4s ease-in-out infinite; }
+.ch-who { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.ch-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.ch-side { color: var(--faint); font-size: 0.78rem; }
+.ch-taken { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; max-width: 11rem; }
+.ch-taken .ch-piece { font-size: 1.05rem; margin-right: -0.2rem; filter: none; }
+.ch-taken .ch-piece.is-w { -webkit-text-stroke: 0.05em #1A1712; }
+.ch-taken .ch-piece.is-b { color: #3E414B; -webkit-text-stroke: 0.06em #A29E96; }
+.ch-plus { margin-left: 0.5rem; color: var(--muted); font-size: 0.8rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+@container (min-width: 760px) {
+  .ch-card { grid-template-columns: auto minmax(0, 1fr); row-gap: 0.1rem; }
+  .ch-taken { grid-column: 2; justify-content: flex-start; max-width: none; }
+  .ch-taken:empty { display: none; }
+}
+
+/* Moves: a strip on phones, a column on wide stages. */
+.ch-moves { grid-area: moves; display: flex; gap: 0.15rem 0.6rem; margin: 0; padding: 0.4rem 0.6rem; list-style: none; overflow-x: auto; scrollbar-width: thin;
+  border-radius: var(--r-medium); background: var(--night-2); border: 1px solid var(--line); font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; }
+.ch-moves li { display: flex; gap: 0.35rem; }
+.ch-num { color: var(--dim); }
+.ch-san { color: var(--paper-2); }
+.ch-san.is-now { color: var(--paper); font-weight: 700; }
+@container (min-width: 760px) {
+  .ch-moves { display: grid; grid-auto-rows: min-content; align-content: start; overflow-x: hidden; overflow-y: auto; max-height: 21rem; min-height: 6rem; padding: 0.4rem 0; }
+  .ch-moves li { display: grid; grid-template-columns: 2.4rem 1fr 1fr; padding: 0.2rem 0.75rem; }
+  .ch-moves li:nth-child(even) { background: rgb(255 255 255 / 0.025); }
+}
+
+/* Draw offers and resigning. */
+.ch-offer { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 0.5rem; width: 100%; padding: 0.6rem 0.75rem; border-radius: var(--r-medium);
+  background: var(--wait-bg); color: var(--wait-text); font-weight: 600; font-size: 0.9rem; text-align: center; animation: rise-in 0.3s var(--ease-out) backwards; }
+.ch-offer span { grid-column: 1 / -1; }
+.ch-resign-sure { background: var(--danger-bg); color: var(--danger-text); border-color: transparent; }
+
+/* Promotion: the four pieces over the board. */
+.ch-promo { position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; justify-items: center; gap: 0.75rem; border-radius: 8px;
+  background: rgb(10 11 16 / 0.72); backdrop-filter: blur(3px); animation: rise-in 0.2s var(--ease-out) backwards; }
+.ch-promo p { margin: 0; font-weight: 650; }
+.ch-promo-row { display: flex; gap: 0.5rem; }
+.ch-promo-pick { display: grid; place-items: center; width: clamp(3.4rem, 15cqw, 4.6rem); aspect-ratio: 1; padding: 0; border: 0; border-radius: 12px; background: var(--light); container-type: size; cursor: pointer;
+  box-shadow: 0 8px 20px -8px rgb(0 0 0 / 0.7); transition: transform var(--t-fast) var(--ease-out); }
+.ch-promo-pick:hover { transform: translateY(-3px); }
+.ch-promo-pick:nth-child(even) { background: var(--dark); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ch-offer, .ch-promo, .ch-card.is-turn .ch-dot { animation: none; }
+}
