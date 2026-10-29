@@ -12,7 +12,11 @@
 .hm-word { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem 1.4rem; max-width: 40rem; }
 .hm-w { display: flex; gap: 0.35rem; }
 .hm-slot { display: grid; place-items: end center; width: clamp(1.6rem, 1.2rem + 2cqw, 2.4rem); height: clamp(2.1rem, 1.6rem + 2.4cqw, 3rem); border-bottom: 3px solid var(--line-4); font-size: clamp(1.3rem, 1rem + 1.6cqw, 1.9rem); font-weight: 750; line-height: 1.2; }
-.hm-slot.is-open { border-color: var(--paper-2); animation: g-pop 0.25s var(--ease-pop); }
+.hm-slot.is-open { border-color: var(--paper-2); }
+.hm-slot.is-new { animation: g-pop 0.3s var(--ease-pop); }
+/* On the chooser's screen: found letters in the finder's color, the rest dim. */
+.hm-slot.is-found { color: var(--c); border-color: var(--c); background: linear-gradient(to top, color-mix(in srgb, var(--c) 18%, transparent), transparent 70%); border-radius: 6px 6px 0 0; }
+.hm-slot.is-waiting { color: var(--dim); border-color: var(--line-4); }
 .hm-slot.is-missed { color: var(--error); }
 .hm-slot.is-mark { border-color: transparent; width: auto; }
 .hm-wait { color: var(--muted); }

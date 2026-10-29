@@ -39,6 +39,7 @@ function begin(s, word) {
   s.word = word;
   s.phase = 'guess';
   s.guessed = [];
+  s.found = {}; // letter -> who found it, shown on the chooser's screen in their color
   s.wrong = 0;
   s.misses = [];
 }
@@ -88,6 +89,7 @@ export default {
       if (!s.setter) {
         const letter = shuffle([...new Set(s.word.toLowerCase().replace(/[^a-z]/g, ''))].filter((l) => !s.guessed.includes(l)), ctx.rng)[0];
         s.guessed.push(letter);
+        s.found[letter] = by;
         s.hint = `There’s ${/[aeiou]/.test(letter) ? 'an' : 'a'} ${letter.toUpperCase()}`;
       }
       check(s, ctx.players);
@@ -97,8 +99,10 @@ export default {
       const guess = squash(m.word);
       if (!guess) throw new Nope('Type a guess.');
       s.log.push({ by, word: text(m.word, 40), right: guess === squash(s.word) });
-      if (guess === squash(s.word)) s.guessed = [...new Set([...s.guessed, ...s.word.toLowerCase().replace(/[^a-z]/g, '')])];
-      else s.wrong++;
+      if (guess === squash(s.word)) {
+        for (const l of s.word.toLowerCase().replace(/[^a-z]/g, '')) if (!s.found[l]) s.found[l] = by;
+        s.guessed = [...new Set([...s.guessed, ...s.word.toLowerCase().replace(/[^a-z]/g, '')])];
+      } else s.wrong++;
       check(s, ctx.players);
       return;
     }
@@ -107,7 +111,8 @@ export default {
     if (s.guessed.includes(letter)) throw new Nope('That letter was already guessed.');
     s.guessed.push(letter);
     const right = s.word.toLowerCase().includes(letter);
-    if (!right) { s.wrong++; s.misses.push(letter); }
+    if (right) s.found[letter] = by;
+    else { s.wrong++; s.misses.push(letter); }
     s.log.push({ by, letter, right });
     if (s.log.length > 30) s.log.shift();
     check(s, ctx.players);

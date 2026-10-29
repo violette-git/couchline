@@ -73,7 +73,7 @@ The **Games** tab has 27 games everyone in the room plays together. Rooms don't 
 - People in the room who aren't playing watch. Games marked for it (the word, party, and puzzle games) take players who join mid-game.
 - When a game ends: Play again (whoever went first goes last), Change players, or pick another. Wins are counted in the Games tab for as long as the room lasts.
 - Search the tab by name or by another name for it (Connect 4, Reversi, Noughts and Crosses, Kalah, Concentration, and so on).
-- Hangman gives eight misses. The word comes from Couchline (pick a topic in the lobby) or from the first player, who types the word, a topic everyone sees, and optionally a hint. Once a game, anyone guessing can open the hint (with Couchline's words, it shows a letter). Curly apostrophes and long dashes from phone keyboards work like ' and -.
+- Hangman gives eight misses. The word comes from Couchline (pick a topic in the lobby) or from the first player, who types the word, a topic everyone sees, and optionally a hint. Once a game, anyone guessing can open the hint (with Couchline's words, it shows a letter). Curly apostrophes and long dashes from phone keyboards work like ' and -. The person who chose the word sees all of it, with letters already found in the color of whoever found them and the rest dim.
 - To add a game, see [games/README.md](games/README.md).
 
 Up next has three ways to add something (paste a link, pick a file, type a show), and every source is listed under the link box with how to get its link.

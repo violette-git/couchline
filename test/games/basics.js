@@ -126,4 +126,18 @@ g.move('p1', { word: "Rock 'n' Roll" });
 assert.equal(g.view('p1').word, "Rock 'n' Roll");
 check.ok('hangman: apostrophes and hyphens, straight or curly, in chosen words');
 
+// Who found each letter, for the chooser's screen.
+g = play('hangman', 3, { from: 'player' });
+g.move('p1', { word: 'Popcorn Night', hint: 'Snack' });
+g.move('p2', { letter: 'o' });
+g.move('p3', { letter: 'z' });
+g.move('p3', { letter: 'n' });
+assert.deepEqual(g.view('p1').found, { o: 'p2', n: 'p3' }, 'right letters remember who found them; misses don’t');
+g.move('p2', { hint: true });
+assert.deepEqual(Object.keys(g.view('p1').found), ['o', 'n'], 'a written hint finds no letters');
+g.move('p3', { word: 'popcorn night' });
+assert.equal(g.view('p1').found.p, 'p3', 'a whole-word guess finds the rest');
+assert.equal(g.view('p1').found.o, 'p2', 'and keeps who found the earlier ones');
+check.ok('hangman: who found each letter, for the chooser’s screen');
+
 console.log(`\n${check.count} basic game checks passed\n`);

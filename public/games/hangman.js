@@ -31,6 +31,7 @@ function drawing(wrong, max, lost) {
 export default function mount(root, api) {
   const { el } = api;
   let chooseBox = null;
+  let seen = null; // letters already found at the last update, so only new ones pop
 
   // The word and its topic, kept between updates so typing isn't interrupted.
   function chooser() {
@@ -81,16 +82,28 @@ export default function mount(root, api) {
       const canGuess = api.isPlayer() && !over && s.setter !== api.me;
       const states = {};
       for (const l of s.guessed) states[l] = s.misses.includes(l) ? 'wrong' : 'right';
-      // The word: one tile per letter, words kept together so they wrap as words.
+      // The word: one tile per letter, words kept together so they wrap as words. The chooser
+      // sees every letter: the ones found so far in the color of whoever found them, the rest dim.
+      const isChooser = s.setter === api.me && !over;
+      const found = s.found || {};
+      const fresh = (l) => seen && found[l] && !seen.has(l);
       const words = [];
       let cur = [];
       s.mask.forEach((ch, i) => {
         if (ch === ' ') { words.push(cur); cur = []; return; }
         const open = ch != null;
-        const missed = over && open && /[a-z]/i.test(ch) && !s.guessed.includes(ch.toLowerCase());
-        cur.push(el('span', { class: `hm-slot${open ? ' is-open' : ''}${missed ? ' is-missed' : ''}${/[a-z]/i.test(ch || 'a') ? '' : ' is-mark'}`, 'data-i': String(i) }, open ? ch.toUpperCase() : ''));
+        const letter = /[a-z]/i.test(ch || '') ? ch.toLowerCase() : null;
+        const missed = over && letter && !s.guessed.includes(letter);
+        const by = letter && found[letter] ? api.player(found[letter]) : null;
+        const slot = el('span', {
+          class: `hm-slot${open ? ' is-open' : ''}${missed ? ' is-missed' : ''}${letter || !open ? '' : ' is-mark'}${isChooser && letter ? (by ? ' is-found' : ' is-waiting') : ''}${fresh(letter) ? ' is-new' : ''}`,
+          'data-i': String(i), title: isChooser && by ? `Found by ${api.name(by.id)}` : null,
+        }, open ? ch.toUpperCase() : '');
+        if (isChooser && by) slot.style.setProperty('--c', api.colorOf(by.color));
+        cur.push(slot);
       });
       words.push(cur);
+      seen = new Set(Object.keys(found));
       const last = s.log.at(-1);
       let lastLine = '';
       if (last?.hint) lastLine = `${api.name(last.by)} opened the hint.`;
@@ -109,6 +122,7 @@ export default function mount(root, api) {
         canGuess && s.hintReady ? el('button', { type: 'button', class: 'btn btn-quiet btn-small hm-hint-btn', onclick: () => api.send({ hint: true }) },
           s.setter ? 'Show the hint' : 'Hint: show a letter') : null,
         el('div', { class: 'hm-word', 'aria-label': 'The word so far' }, ...words.map((w) => el('span', { class: 'hm-w' }, ...w))),
+        isChooser ? el('p', { class: 'g-note' }, 'Found letters are in the color of whoever found them. Dim ones are still hidden from everyone.') : null,
         canGuess ? keyboard((l) => api.send({ letter: l }), { states, disabled: !canGuess }) : null,
         canGuess ? answerBox((word) => api.send({ word }), { placeholder: 'Know it? Guess the whole thing', button: 'Guess', maxlength: 40 }) : null,
       ].filter(Boolean));
