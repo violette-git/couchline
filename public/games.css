@@ -174,7 +174,8 @@ button.g-card:disabled { cursor: default; }
 .g-choice.is-picked { border-color: var(--paper); background: #232835; }
 .g-choice.is-right { border-color: #4CC38A; background: #16261F; }
 .g-choice.is-wrong { opacity: 0.55; }
-.g-choice .g-who { display: flex; gap: 3px; margin-left: auto; }
+.g-who { display: flex; gap: 3px; }
+.g-choice .g-who { margin-left: auto; }
 .g-who .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--c); }
 
 /* A score table: one row per player. */

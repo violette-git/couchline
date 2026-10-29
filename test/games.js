@@ -16,7 +16,6 @@ const ROOM = 'games-room-1';
 
 // Every game in the catalog has its rules, its drawing code, and its styles.
 for (const g of CATALOG) {
-  if (process.env.GAMES_PARTIAL) break; // TEMP while games are being written
   for (const f of [`games/${g.id}.js`, `public/games/${g.id}.js`, `public/games/${g.id}.css`]) {
     assert.ok(fs.existsSync(path.join(root, f)), `${g.id} is missing ${f}`);
     assert.ok(!fs.readFileSync(path.join(root, f), 'utf8').includes('PLACEHOLDER'), `${f} is still a placeholder`);
