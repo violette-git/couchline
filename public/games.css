@@ -1,0 +1,196 @@
+/* Games: the Games tab, the lobby, and the shared pieces every game is drawn from (boards,
+   cells, discs, dice, cards, letter tiles, keyboards, score tables). Each game adds its own
+   look in public/games/<id>.css. Person colors keep their meaning here too: a piece, a mark,
+   or a score in someone's color is theirs. */
+
+/* ---------- the Games tab ---------- */
+.games-tab { gap: 0.8rem; }
+.g-search input { min-height: 44px; font-size: 1rem; }
+.g-filters .chip { min-height: 30px; font-size: 0.8125rem; }
+.g-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.5rem; }
+.g-tile {
+  position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto 1fr;
+  gap: 0.1rem 0.6rem; align-items: start; text-align: left; padding: 0.75rem 0.8rem 0.7rem; border-radius: var(--r-medium);
+  border: 1px solid #22262F; background: var(--s2); color: var(--paper);
+  transition: background-color var(--t-fast), border-color var(--t-fast), transform var(--t-fast) var(--ease-out);
+}
+.g-tile:hover { background: #1C2029; border-color: var(--line-4); }
+.g-tile:active { transform: scale(0.98); }
+.g-tile.is-open { border-color: var(--paper-2); }
+.g-tile .g-icon { grid-row: 1 / 3; width: 30px; height: 30px; padding: 6px; border-radius: 9px; background: var(--night); box-shadow: inset 0 0 0 1px var(--line); color: var(--paper-2); }
+.g-tile-name { font-weight: 650; font-size: 0.9rem; line-height: 1.2; align-self: end; }
+.g-tile-blurb { grid-column: 2; color: var(--muted); font-size: 0.78rem; line-height: 1.3; }
+.g-tile-meta { grid-column: 1 / -1; margin-top: 0.45rem; color: var(--faint); font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.02em; align-self: end; }
+.g-icon { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.g-icon-sm { width: 18px; height: 18px; }
+.g-icon-lg { width: 56px; height: 56px; padding: 12px; border-radius: 16px; background: var(--night-3); box-shadow: inset 0 0 0 1px var(--line-2); color: var(--paper); }
+.game-now { animation: msg-in 0.28s var(--ease-out) backwards; }
+.g-scores { display: grid; gap: 0.45rem; padding-top: 0.25rem; }
+.g-score-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.g-score-list li { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.3rem 0.4rem 0.3rem 0.65rem; border-radius: 999px; background: var(--s2); border: 1px solid #22262F; font-size: 0.85rem; }
+.g-score-list .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--c); }
+.g-score-list b { min-width: 1.5rem; padding: 0.05rem 0.4rem; border-radius: 999px; background: var(--night); text-align: center; font-variant-numeric: tabular-nums; font-size: 0.8rem; }
+
+/* ---------- the game on the stage ---------- */
+.stage { scroll-margin-top: calc(4rem + env(safe-area-inset-top)); }
+.stage.is-gaming { aspect-ratio: auto; height: auto; min-height: min(78svh, 34rem); background: var(--screen); }
+.stage.is-gaming > :not(.game-wrap, .react-layer, .ping-layer, .chat-float) { display: none !important; }
+.game-wrap { position: relative; z-index: 4; display: grid; grid-template-rows: auto auto 1fr auto; min-height: inherit; background:
+  radial-gradient(120% 70% at 50% 0%, #151821 0%, transparent 70%), var(--screen); }
+.game-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem 0.75rem; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--line); }
+.game-name { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0; font-weight: 650; }
+.game-name .g-icon { color: var(--muted); }
+.g-players { display: flex; flex-wrap: wrap; gap: 0.35rem; list-style: none; margin: 0; padding: 0; }
+.g-player { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.6rem 0.25rem 0.5rem; border-radius: 999px; border: 1px solid var(--line); font-size: 0.8125rem; color: var(--paper-2); transition: border-color var(--t-med), background-color var(--t-med), color var(--t-med); }
+.g-player .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--c, var(--faint)); flex: none; }
+.g-player .who { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-player .tag { color: var(--faint); font-size: 0.7rem; }
+.g-player.is-turn { border-color: var(--c); color: var(--paper); background: color-mix(in srgb, var(--c) 12%, transparent); }
+.g-player.is-turn .dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); animation: breathe 2.4s ease-in-out infinite; }
+.g-player.is-gone { opacity: 0.55; }
+.g-player.is-empty { border-style: dashed; color: var(--faint); }
+.game-status { margin: 0; font-weight: 650; font-size: 0.9rem; color: var(--c, var(--muted)); min-width: 0; }
+.game-status:empty { display: none; }
+.game-status.is-me { color: var(--paper); }
+.game-status.is-me::before { content: ''; display: inline-block; width: 0.45rem; height: 0.45rem; margin-right: 0.45rem; border-radius: 50%; background: var(--mint); vertical-align: 0.08em; animation: breathe 2.4s ease-in-out infinite; }
+.game-bar-actions { display: flex; gap: 0.4rem; margin-left: auto; }
+.g-timer { display: inline-grid; place-items: center; min-width: 2.4rem; height: 1.9rem; padding: 0 0.5rem; border-radius: 999px; background: var(--night-3); font-family: var(--mono); font-weight: 600; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.g-timer.is-low { background: var(--danger-bg); color: var(--danger-text); }
+.game-rules { margin: 0; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--line); color: var(--paper-2); font-size: 0.9rem; line-height: 1.55; background: var(--night-2); text-wrap: pretty; }
+.game-body { display: grid; place-items: center; padding: clamp(0.75rem, 3cqw, 1.75rem); min-width: 0; }
+.game-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.6rem 1rem; padding: 0.85rem 1rem 1rem; border-top: 1px solid var(--line); background: var(--night-2); animation: rise-in 0.4s var(--ease-out) backwards; }
+.g-result { margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; color: var(--c, var(--paper)); }
+.g-result.is-mine::after { content: ' 🎉'; }
+.g-foot-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* ---------- the lobby ---------- */
+.g-lobby { display: grid; gap: 1rem; width: min(100%, 34rem); animation: rise-in 0.45s var(--ease-out) backwards; }
+.g-lobby-head { display: flex; align-items: center; gap: 1rem; }
+.g-lobby-cat { margin: 0; color: var(--faint); font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.g-lobby-name { margin: 0.1rem 0 0; font-size: clamp(1.6rem, 1.2rem + 2cqw, 2.25rem); line-height: 1.05; letter-spacing: -0.025em; }
+.g-lobby-rules { margin: 0; color: var(--paper-2); line-height: 1.6; text-wrap: pretty; }
+.g-seats { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; margin: 0; padding: 0; }
+.g-seats .g-player { padding: 0.4rem 0.8rem 0.4rem 0.65rem; font-size: 0.9rem; }
+.g-options { display: grid; gap: 0.6rem; }
+.g-option { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; }
+.g-option-label { min-width: 7.5rem; color: var(--muted); font-size: 0.88rem; font-weight: 600; }
+.g-lobby-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.g-lobby-actions .btn-primary { min-width: 8rem; }
+
+/* ---------- shared pieces for games to draw with ---------- */
+.g-play { display: grid; justify-items: center; gap: 1rem; width: 100%; min-width: 0; }
+.g-note { margin: 0; color: var(--muted); font-size: 0.9rem; text-align: center; text-wrap: pretty; }
+.g-big { margin: 0; font-size: clamp(1.5rem, 1rem + 3cqw, 2.4rem); font-weight: 700; letter-spacing: -0.02em; text-align: center; line-height: 1.15; }
+.g-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.5rem; }
+.g-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
+
+/* A square board of buttons: set --cols (and --rows) and give it cells. */
+.g-board { --cols: 3; --rows: var(--cols); --gap: 6px; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), minmax(0, 1fr)); gap: var(--gap);
+  width: min(100%, var(--size, 26rem), calc((78svh - 9rem) * var(--cols) / var(--rows))); aspect-ratio: var(--cols) / var(--rows); padding: var(--gap); border-radius: var(--r-large);
+  background: var(--night-2); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-2); }
+.g-cell { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; padding: 0; border: 0; border-radius: 10px; background: var(--s2); color: var(--paper);
+  transition: background-color var(--t-fast), transform var(--t-fast) var(--ease-out), box-shadow var(--t-med); }
+button.g-cell:not(:disabled):hover { background: #20242E; }
+button.g-cell:not(:disabled):active { transform: scale(0.96); }
+.g-cell:disabled { cursor: default; }
+.g-cell.is-last { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--c, var(--paper)) 55%, transparent); }
+.g-cell.is-win { background: color-mix(in srgb, var(--c) 22%, var(--s2)); box-shadow: inset 0 0 0 2px var(--c); }
+.g-cell.is-hint::after { content: ''; width: 26%; aspect-ratio: 1; border-radius: 50%; background: rgb(243 244 247 / 0.16); }
+
+/* A disc in someone's color (set --c). */
+.g-disc { width: 82%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 70%, #fff) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 70%, #000) 100%);
+  box-shadow: inset 0 -2px 4px rgb(0 0 0 / 0.35), 0 2px 6px rgb(0 0 0 / 0.4); animation: g-pop 0.32s var(--ease-pop) backwards; }
+@keyframes g-pop { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes g-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+/* Dice: five pips laid out by data-n (1 to 6). */
+.g-die { --s: 3.25rem; position: relative; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); width: var(--s); height: var(--s); padding: calc(var(--s) * 0.14); border-radius: calc(var(--s) * 0.2);
+  background: linear-gradient(160deg, #FBFBFD, #D9DCE4); box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.12), 0 4px 10px rgb(0 0 0 / 0.45); border: 0; color: var(--night); }
+.g-die i { width: 70%; aspect-ratio: 1; margin: auto; border-radius: 50%; background: currentColor; visibility: hidden; }
+.g-die[data-n="1"] i:nth-child(5),
+.g-die[data-n="2"] i:is(:nth-child(1), :nth-child(9)),
+.g-die[data-n="3"] i:is(:nth-child(1), :nth-child(5), :nth-child(9)),
+.g-die[data-n="4"] i:is(:nth-child(1), :nth-child(3), :nth-child(7), :nth-child(9)),
+.g-die[data-n="5"] i:is(:nth-child(1), :nth-child(3), :nth-child(5), :nth-child(7), :nth-child(9)),
+.g-die[data-n="6"] i:is(:nth-child(1), :nth-child(3), :nth-child(4), :nth-child(6), :nth-child(7), :nth-child(9)) { visibility: visible; }
+.g-die.is-rolling { animation: g-roll 0.5s var(--ease-out); }
+.g-die.is-held { transform: translateY(-6px); box-shadow: 0 0 0 3px var(--c, var(--paper)), 0 8px 16px rgb(0 0 0 / 0.5); }
+button.g-die { cursor: pointer; transition: transform var(--t-med) var(--ease-pop), box-shadow var(--t-med); }
+button.g-die:disabled { cursor: default; }
+@keyframes g-roll { 0% { transform: rotate(-200deg) scale(0.7); } 70% { transform: rotate(12deg) scale(1.05); } 100% { transform: none; } }
+
+/* Playing cards: rank and suit, red or black. */
+.g-card { --w: 4.2rem; position: relative; display: grid; grid-template-rows: auto 1fr; width: var(--w); aspect-ratio: 5 / 7; padding: calc(var(--w) * 0.08) calc(var(--w) * 0.1); border-radius: calc(var(--w) * 0.12);
+  background: linear-gradient(170deg, #FDFDFE, #E7E9EF); color: #1B1E27; border: 0; font-weight: 700; box-shadow: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 6px 14px rgb(0 0 0 / 0.45);
+  animation: g-deal 0.35s var(--ease-out) backwards; text-align: left; }
+.g-card.is-red { color: #C8323C; }
+.g-card .g-rank { font-size: calc(var(--w) * 0.3); line-height: 1; }
+.g-card .g-suit { align-self: center; justify-self: center; font-size: calc(var(--w) * 0.5); line-height: 1; }
+.g-card.is-back { background: repeating-linear-gradient(45deg, #2A2F3D 0 6px, #232733 6px 12px); box-shadow: inset 0 0 0 3px #F3F4F7, inset 0 0 0 5px #2A2F3D, 0 6px 14px rgb(0 0 0 / 0.45); }
+.g-card.is-back > * { display: none; }
+button.g-card { cursor: pointer; transition: transform var(--t-med) var(--ease-out), box-shadow var(--t-med); }
+button.g-card:not(:disabled):hover { transform: translateY(-6px); }
+button.g-card:disabled { cursor: default; }
+.g-card.is-dim { filter: brightness(0.6) saturate(0.6); }
+.g-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; }
+.g-hand.is-fan .g-card + .g-card { margin-left: calc(var(--w) * -0.45); }
+@keyframes g-deal { from { transform: translateY(-14px) rotate(-4deg); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Letter tiles, for word games. data-state: right, close, wrong. */
+.g-tiles { display: flex; justify-content: center; gap: 6px; }
+.g-letter { display: grid; place-items: center; width: var(--t, 3rem); aspect-ratio: 1; border-radius: 8px; border: 2px solid var(--line-2); background: transparent; font-size: calc(var(--t, 3rem) * 0.5); font-weight: 750; text-transform: uppercase; color: var(--paper); }
+.g-letter:not(:empty) { border-color: var(--line-4); animation: g-pop 0.18s var(--ease-pop); }
+.g-letter[data-state] { border-color: transparent; animation: g-flip 0.5s var(--ease-out) backwards; }
+.g-letter[data-state="right"] { background: #2E8B5E; }
+.g-letter[data-state="close"] { background: #B88A1B; }
+.g-letter[data-state="wrong"] { background: #343947; color: var(--paper-2); }
+@keyframes g-flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+
+/* An on-screen keyboard. data-state on keys: right, close, wrong, used. */
+.g-keys { display: grid; gap: 6px; width: min(100%, 32rem); }
+.g-keys-row { display: flex; justify-content: center; gap: 5px; }
+.g-key { flex: 1 1 0; max-width: 2.6rem; min-height: 3rem; padding: 0; border: 0; border-radius: 7px; background: #3A4053; color: var(--paper); font-weight: 700; font-size: 0.95rem; text-transform: uppercase;
+  transition: background-color var(--t-fast), transform var(--t-fast) var(--ease-out); }
+.g-key.is-wide { flex-grow: 1.6; max-width: 4.4rem; font-size: 0.75rem; }
+.g-key:not(:disabled):hover { background: #474E64; }
+.g-key:not(:disabled):active { transform: scale(0.94); }
+.g-key[data-state="right"] { background: #2E8B5E; }
+.g-key[data-state="close"] { background: #B88A1B; }
+.g-key[data-state="wrong"], .g-key[data-state="used"] { background: #23272F; color: var(--dim); }
+.g-key:disabled { cursor: default; }
+
+/* Typed answers (scramble, emoji movies, draw and guess). */
+.g-answer { display: flex; gap: 0.5rem; width: min(100%, 26rem); }
+.g-answer input { flex: 1; min-width: 0; min-height: 46px; padding: 0 0.9rem; border-radius: 10px; border: 1px solid var(--line-2); background: var(--night); color: var(--paper); font-size: 1rem; }
+.g-answer input:focus { outline: none; border-color: var(--paper-2); }
+
+/* Big answer buttons (trivia, would you rather, rock paper scissors). */
+.g-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: 0.6rem; width: min(100%, 40rem); }
+.g-choice { position: relative; display: flex; align-items: center; gap: 0.7rem; min-height: 3.6rem; padding: 0.8rem 1rem; border-radius: var(--r-medium); border: 1px solid var(--line-2); background: var(--s2); color: var(--paper); font-weight: 600; font-size: 1rem; text-align: left; line-height: 1.3;
+  transition: background-color var(--t-fast), border-color var(--t-fast), transform var(--t-fast) var(--ease-out), opacity var(--t-med); }
+.g-choice:not(:disabled):hover { background: #20242E; border-color: var(--line-4); }
+.g-choice:not(:disabled):active { transform: scale(0.98); }
+.g-choice:disabled { cursor: default; }
+.g-choice.is-picked { border-color: var(--paper); background: #232835; }
+.g-choice.is-right { border-color: #4CC38A; background: #16261F; }
+.g-choice.is-wrong { opacity: 0.55; }
+.g-choice .g-who { display: flex; gap: 3px; margin-left: auto; }
+.g-who .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--c); }
+
+/* A score table: one row per player. */
+.g-scoreboard { display: grid; gap: 0.3rem; width: min(100%, 22rem); margin: 0; padding: 0; list-style: none; }
+.g-scoreboard li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.6rem; padding: 0.4rem 0.7rem; border-radius: 10px; background: var(--s2); font-size: 0.9rem; }
+.g-scoreboard li.is-turn { box-shadow: inset 0 0 0 1px var(--c); }
+.g-scoreboard .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--c); }
+.g-scoreboard b { font-variant-numeric: tabular-nums; font-size: 1rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .g-disc, .g-card, .g-letter, .g-die.is-rolling, .g-lobby, .game-foot { animation: none !important; }
+}
+
+/* ---------- the landing page's list of games ---------- */
+.g-shelf { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 28px 32px; margin-top: 48px; }
+.g-shelf-group h3 { margin: 0 0 12px; color: var(--faint); font-family: var(--mono); font-size: 0.75rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; }
+.g-shelf-group ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.g-shelf-group li { display: flex; align-items: center; gap: 10px; color: var(--paper-2); font-weight: 500; }
+.g-shelf-group .g-icon { width: 30px; height: 30px; padding: 6px; border-radius: 9px; background: var(--night-3); box-shadow: inset 0 0 0 1px var(--line-2); color: var(--paper); }

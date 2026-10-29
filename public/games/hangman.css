@@ -1,0 +1,18 @@
+.hm-top { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.5rem 2rem; }
+.hm-drawing { width: clamp(9rem, 30cqw, 12rem); height: auto; fill: none; stroke: var(--paper); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.hm-gallows { stroke: var(--line-4); }
+.hm-part.is-new { animation: g-pop 0.3s var(--ease-pop); transform-origin: 140px 100px; }
+.hm-drawing.is-lost { stroke: var(--error); }
+.hm-side { display: grid; gap: 0.5rem; min-width: 11rem; }
+.hm-left { margin: 0; color: var(--muted); }
+.hm-left b { color: var(--paper); font-size: 2rem; font-variant-numeric: tabular-nums; margin-right: 0.15rem; }
+.hm-misses { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0; }
+.hm-misses span { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 6px; background: var(--danger-bg); color: var(--danger-text); font-weight: 700; font-size: 0.85rem; text-decoration: line-through; }
+.hm-log { text-align: left; min-height: 1.4em; }
+.hm-word { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem 1.4rem; max-width: 40rem; }
+.hm-w { display: flex; gap: 0.35rem; }
+.hm-slot { display: grid; place-items: end center; width: clamp(1.6rem, 1.2rem + 2cqw, 2.4rem); height: clamp(2.1rem, 1.6rem + 2.4cqw, 3rem); border-bottom: 3px solid var(--line-4); font-size: clamp(1.3rem, 1rem + 1.6cqw, 1.9rem); font-weight: 750; line-height: 1.2; }
+.hm-slot.is-open { border-color: var(--paper-2); animation: g-pop 0.25s var(--ease-pop); }
+.hm-slot.is-missed { color: var(--error); }
+.hm-slot.is-mark { border-color: transparent; width: auto; }
+.hm-wait { color: var(--muted); }

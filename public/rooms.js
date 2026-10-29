@@ -86,7 +86,7 @@ export function initBrowse() {
             r.now && r.playing ? el('span', { class: 'room-live' }, 'Playing') : null),
           el('div', { class: 'room-card-text' },
             el('p', { class: 'room-card-title' }, r.title || r.id),
-            el('p', { class: 'room-card-now' }, r.now ? `${label}: ${r.now.title}` : 'Nothing on yet'),
+            el('p', { class: 'room-card-now' }, r.game ? `Playing ${r.game}` : r.now ? `${label}: ${r.now.title}` : 'Nothing on yet'),
             el('p', { class: 'room-card-people' },
               el('span', { class: 'room-dots', 'aria-hidden': 'true' }, ...r.people.slice(0, 8).map((p) => {
                 const d = el('span', { class: 'dot' });

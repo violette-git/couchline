@@ -14,6 +14,7 @@ import { $, el, store, colorOf, toast, listNames } from './ui.js';
 import { initSocial } from './social.js';
 import { initAdding, handleShareLanding } from './adding.js';
 import { initCreate, initBrowse, pendingRoom } from './rooms.js';
+import { initGames, renderShelf } from './games.js';
 
 const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
 const WORDS_A = ['maple', 'velvet', 'quiet', 'amber', 'cozy', 'late', 'lucky', 'sunny', 'hazel', 'cobalt'];
@@ -70,6 +71,7 @@ if (handleShareLanding()) {
   }
 } else {
   show('landing');
+  renderShelf($('#gameShelf'));
 }
 
 initCreate({ newRoomCode });
@@ -125,7 +127,7 @@ const inBox = (it) => IN_BOX.includes(it?.kind);
 const isLive = (it) => !!it?.live || (!!it && player?.key === it.id && player.live);
 
 // ---------- room ----------
-let socket, clock, call, share, social, adding, swipe, popout;
+let socket, clock, call, share, social, adding, swipe, popout, games;
 let room = null;
 let me = { remote: false };
 let lastItemId = null;
@@ -167,6 +169,7 @@ function enterRoom(opts) {
   swipe = initSwipe({ socket, getRoom: () => room });
   popout = initPopout({ call, getRoom: () => room, onChange: () => renderCallButtons() });
   social = initSocial({ socket, clientId, getRoom: () => room, expectedNow, durationNow, isLive, thumbUrl });
+  games = initGames({ socket, clientId, getRoom: () => room, now: () => clock.now() });
   if (opts.call) startCall(); // inside the tap, so iOS allows camera and audio
 
   socket.on('connect', () => {
@@ -193,6 +196,8 @@ function enterRoom(opts) {
   socket.on('typing', (t) => social.onTyping(t));
   socket.on('ping', (p) => social.onPing(p));
   socket.on('go', onGo);
+  socket.on('game', (g) => games.onGame(g));
+  socket.on('game:relay', (r) => games.onRelay(r));
   // The call and file sharing use the same relay; file messages are marked "share".
   socket.on('signal', (d) => (d.msg?.share ? share.handleSignal(d) : call.handleSignal(d)));
 
@@ -217,6 +222,7 @@ function onState(s) {
   renderRoomSettings();
   social.onState(s);
   swipe.render(s);
+  games.render(s);
   renderCallButtons();
   call.sync(s.members);
   tick();
@@ -642,7 +648,7 @@ $('#scrub').addEventListener('change', (e) => {
 $('#startTogether').addEventListener('click', () => socket.emit('countdown:start', { seconds: 5 }));
 $('#cancelCountdown').addEventListener('click', () => socket.emit('countdown:cancel'));
 document.addEventListener('keydown', (e) => {
-  if (!room || e.target.closest('input, select, textarea, button')) return;
+  if (!room || games?.active || e.target.closest('input, select, textarea, button')) return;
   if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
   if (e.code === 'ArrowLeft') seekBy(-10);
   if (e.code === 'ArrowRight') seekBy(10);

@@ -20,6 +20,7 @@
   <link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/geist-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/games.css">
 </head>
 <body>
 
@@ -56,6 +57,7 @@
           <a href="#watch">What you can watch</a>
           <a href="#how">How it works</a>
           <a href="#features">Features</a>
+          <a href="#games">Games</a>
           <a href="/rooms">Public rooms</a>
           <a href="#faq">FAQ</a>
         </nav>
@@ -231,7 +233,16 @@
         </div>
       </section>
 
-      <section id="faq" class="band band-alt">
+      <section id="games" class="band band-alt">
+        <div class="wrap">
+          <p class="eyebrow">Games</p>
+          <h2 class="section-title">Game night, built in.</h2>
+          <p class="section-lede">Between episodes, pick a game and it opens for everyone in the room, right where the video plays. The call stays on, so the trash talk is face to face. Couchline keeps score and keeps everyone honest: nobody can peek at a hidden word or someone else’s hand.</p>
+          <div id="gameShelf" class="g-shelf"></div>
+        </div>
+      </section>
+
+      <section id="faq" class="band">
         <div class="wrap faq">
           <div>
             <p class="eyebrow">FAQ</p>
@@ -253,6 +264,10 @@
             <details>
               <summary>Who can join my room?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
               <p>Private rooms (the default) are only for people with the code or link, and never show up anywhere. Public rooms are listed in Public rooms while someone is in them, and anyone can join.</p>
+            </details>
+            <details>
+              <summary>What games are there?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+              <p>Board games like chess, checkers, and Four in a Row; word games like Hangman, Word Race, and Draw and Guess; party games like Trivia and Would You Rather; cards and dice like Blackjack and Yacht Dice; and puzzles you solve together, like Sudoku and Minesweeper. Open the Games tab in any room.</p>
             </details>
             <details>
               <summary>What happens with YouTube ads?<svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></summary>
@@ -376,6 +391,7 @@
             <p class="hint">Send it to whoever you’re watching with, or tap Invite. They can type it on the Couchline home page.</p>
             <p class="empty-title">Nothing’s on yet</p>
             <p class="hint">Add something in Up next: a link, a file from your device, or a show name.</p>
+            <p><button id="emptyPlay" type="button" class="btn btn-small">Or play a game</button></p>
           </div>
 
           <div id="playerWrap" class="fill" hidden>
@@ -443,6 +459,23 @@
             <p id="extNote" class="hint ext-note" hidden></p>
             <p><a id="extGet" class="btn btn-small ext-room-link" href="/extension" hidden>Get the extension</a></p>
             <p><button id="becomeRemote" class="btn btn-small" hidden>Use this tab as a remote</button></p>
+          </div>
+
+          <div id="gameWrap" class="game-wrap" hidden>
+            <div class="game-bar">
+              <p id="gameName" class="game-name"></p>
+              <ul id="gamePlayers" class="g-players" aria-label="Players"></ul>
+              <span id="gameTimer" class="g-timer" hidden aria-label="Seconds left"></span>
+              <p id="gameStatus" class="game-status" role="status"></p>
+              <div class="game-bar-actions">
+                <button id="gameJoin" class="btn btn-primary btn-small" hidden>Join game</button>
+                <button id="gameRulesBtn" class="btn btn-quiet btn-small" aria-expanded="false" aria-controls="gameRules">How to play</button>
+                <button id="gameEnd" class="btn btn-quiet btn-small">Close</button>
+              </div>
+            </div>
+            <p id="gameRules" class="game-rules" hidden></p>
+            <div id="gameBody" class="game-body"></div>
+            <div id="gameFoot" class="game-foot" hidden aria-live="polite"></div>
           </div>
 
           <div id="countdown" class="countdown" hidden aria-live="assertive">
@@ -535,6 +568,7 @@
         <div class="tabs" role="tablist">
           <button role="tab" id="tabNextBtn" aria-selected="true" aria-controls="tabNext">Up next</button>
           <button role="tab" id="tabChatBtn" aria-selected="false" aria-controls="tabChat">Chat <span id="chatBadge" class="badge" hidden></span></button>
+          <button role="tab" id="tabGamesBtn" aria-selected="false" aria-controls="tabGames">Games</button>
           <button role="tab" id="tabShowsBtn" aria-selected="false" aria-controls="tabShows">Shows</button>
           <button role="tab" id="tabWatchedBtn" aria-selected="false" aria-controls="tabWatched">Watched</button>
         </div>
@@ -547,6 +581,25 @@
             <input id="chatInput" placeholder="Message, or paste a link to share" maxlength="500" autocomplete="off" enterkeyhint="send">
             <button class="btn btn-primary">Send</button>
           </form>
+        </div>
+
+        <div id="tabGames" class="tab games-tab" role="tabpanel" aria-labelledby="tabGamesBtn" hidden>
+          <div id="gameNowCard" class="swipe-card game-now" hidden>
+            <p id="gameNowText" class="swipe-title"></p>
+            <button id="gameNowGo" class="btn btn-small">Go to it</button>
+          </div>
+          <p class="hint">Pick a game and it opens for everyone, right where the video plays. The video pauses while you play.</p>
+          <div class="browse-search g-search" role="search">
+            <label for="gameSearch" class="sr">Search games</label>
+            <input id="gameSearch" type="search" placeholder="Search games" autocomplete="off">
+          </div>
+          <div id="gameFilters" class="source-chips g-filters" aria-label="Kinds of games"></div>
+          <ul id="gameGrid" class="g-grid"></ul>
+          <p id="gameNone" class="note" hidden>No games match that.</p>
+          <section id="gameScores" class="g-scores" hidden>
+            <p class="room-menu-label">Wins in this room</p>
+            <ol id="gameScoreList" class="g-score-list"></ol>
+          </section>
         </div>
 
         <div id="tabWatched" class="tab" role="tabpanel" aria-labelledby="tabWatchedBtn" hidden>

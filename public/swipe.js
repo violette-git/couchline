@@ -31,7 +31,7 @@ export function initSwipe({ socket, getRoom }) {
 
   // Arrow keys, and swiping on the space around the video (the video itself takes its own taps).
   document.addEventListener('keydown', (e) => {
-    if (!deck()?.on || e.target.closest('input, select, textarea')) return;
+    if (!deck()?.on || $('#stage').classList.contains('is-gaming') || e.target.closest('input, select, textarea')) return;
     if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); go(1); }
     if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); go(-1); }
   });

@@ -1,5 +1,5 @@
 // Couchline server: rooms, shared playback state, queue, show tracker, buffering holds,
-// a relay for WebRTC call signaling, chat and the room's social extras, and a small HTTP
+// a relay for WebRTC call signaling, chat and the room's social extras, games, and a small HTTP
 // API so the browser extension and phone share sheets can add things without a link paste.
 import express from 'express';
 import http from 'node:http';
@@ -10,6 +10,8 @@ import { zipSync, strToU8 } from 'fflate';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { parseMedia, mediaWarnings, IN_BOX, EXT_SERVICES } from './public/media.js';
+import { createGames } from './games/engine.js';
+import { GAME } from './public/games/catalog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -218,6 +220,8 @@ function getRoom(roomId) {
       // Title and who can find the room. Private rooms are joined by code or link only;
       // public rooms are listed in the directory while someone is in them.
       title: null, visibility: 'private', host: null,
+      // The game everyone is playing (see games/engine.js), and wins so far.
+      game: null, gameScores: {}, gameTimer: null,
     };
     rooms.set(roomId, room);
   }
@@ -303,10 +307,23 @@ function publicState(room) {
     follow: room.follow,
     reels: { ...room.reels, driverName: room.members.get(room.reels.driver)?.name || null },
     settings: room.settings,
+    games: games.summary(room),
     serverNow: Date.now(),
   };
 }
 const toast = (room, text, by) => io.to(room.id).emit('toast', { text, color: by?.color || null });
+
+// Games take over the stage, so opening one pauses whatever is playing.
+const games = createGames({
+  io, toast, broadcast: (room) => broadcast(room),
+  onOpen(room, by) {
+    if (!synced(room) || !room.playback.playing || Date.now() < room.playback.at) return;
+    clearCountdown(room);
+    clearHolds(room);
+    setPlayback(room, false, posNow(room));
+    toast(room, `Paused at ${fmt(room.playback.position)} for the game`, by);
+  },
+});
 
 // Scores stay hidden until everyone has answered, then reveal together.
 function publicRating(r) {
@@ -660,12 +677,12 @@ app.post('/api/follow/stop', (req, res) => {
 // YouTube search, when a key is set. Results are cached briefly to save quota.
 const searchCache = new Map();
 // The public room directory: public rooms with people in them, busiest first. Searches the
-// room's title, what's on, and its code.
+// room's title, what's on, the game being played, and its code.
 app.get('/api/rooms', (req, res) => {
   const q = str(req.query.q, 60).toLowerCase();
   const list = [...rooms.values()]
     .filter((r) => r.visibility === 'public' && r.members.size)
-    .filter((r) => !q || [r.title, r.current?.title, r.id].some((s) => s && s.toLowerCase().includes(q)))
+    .filter((r) => !q || [r.title, r.current?.title, r.game && GAME[r.game.type].name, r.id].some((s) => s && s.toLowerCase().includes(q)))
     .sort((a, b) => b.members.size - a.members.size || (b.lastActive || 0) - (a.lastActive || 0))
     .slice(0, 50)
     .map((r) => ({
@@ -673,6 +690,7 @@ app.get('/api/rooms', (req, res) => {
       title: r.title,
       people: [...r.members.values()].filter((m) => !m.remote).map((m) => ({ name: m.name, color: m.color })),
       playing: r.playback.playing && Date.now() >= r.playback.at,
+      game: r.game ? GAME[r.game.type].name : null,
       now: r.current ? {
         title: r.current.title, kind: r.current.kind, service: r.current.service || null, videoId: r.current.videoId || null,
         thumb: r.current.thumb || null, poster: r.current.poster || null, live: !!r.current.live, channel: r.current.channel || null,
@@ -775,6 +793,7 @@ io.on('connection', (socket) => {
     socket.join(roomId);
     if (typeof cb === 'function') cb({ ok: true, clientId, iceServers: iceServers(), twitchParent: TWITCH_PARENT, youtubeSearch: !!YOUTUBE_API_KEY, chat: room.chat.slice(-100) });
     broadcast(room);
+    if (room.game) games.send(room, me.id);
     if (!previous) toast(room, `${me.name} joined`, me);
   });
 
@@ -1172,6 +1191,9 @@ io.on('connection', (socket) => {
     toast(room, `${me.name} ended swiping together`, me);
   });
 
+  // ----- games (rules and referee in games/) -----
+  for (const [event, fn] of Object.entries(games.handlers)) on(event, (d, cb) => fn(room, me, d, cb));
+
   on('follow:stop', () => {
     if (!room.follow) return;
     room.follow = null;
@@ -1205,6 +1227,7 @@ io.on('connection', (socket) => {
     if (me.inCall && me.callSince) (room.callPlaces ||= new Map()).set(me.id, { since: me.callSince, left: Date.now() });
     room.members.delete(me.id);
     maybeReveal(room);
+    games.left(room, me.id);
     clearTimeout(room.holds.get(me.id));
     room.holds.delete(me.id);
     if (room.members.size) {
@@ -1219,7 +1242,7 @@ io.on('connection', (socket) => {
       updateHolds(room);
       broadcast(room);
     } else {
-      room.cleanup = setTimeout(() => { clearCountdown(room); clearHolds(room); rooms.delete(room.id); }, ROOM_TTL_MS);
+      room.cleanup = setTimeout(() => { clearCountdown(room); clearHolds(room); games.clear(room); rooms.delete(room.id); }, ROOM_TTL_MS);
     }
   });
 });

@@ -1,0 +1,10 @@
+.c4-board { --cols: 7; --rows: 6; --gap: 7px; --size: 34rem; background: #1A2340; box-shadow: inset 0 0 0 1px #2B3A66, var(--shadow-2); overflow: hidden; }
+.c4-cell { border-radius: 50%; background: #0C1022; box-shadow: inset 0 3px 6px rgb(0 0 0 / 0.55); }
+button.c4-cell:not(:disabled):hover, .c4-cell.is-col { background: #16203E; }
+.c4-cell.is-win { background: #0C1022; box-shadow: inset 0 0 0 3px var(--c); }
+.c4-cell.is-last { box-shadow: inset 0 3px 6px rgb(0 0 0 / 0.55); }
+.c4-cell .g-disc { width: 86%; animation: none; }
+.c4-cell .g-disc.is-new { animation: c4-drop 0.42s cubic-bezier(0.5, 0, 0.75, 0) backwards, c4-bounce 0.25s 0.42s var(--ease-out); }
+.c4-cell.is-win .g-disc { animation: g-flash 1.2s ease-in-out infinite; }
+@keyframes c4-drop { from { transform: translateY(var(--drop, -300%)); } }
+@keyframes c4-bounce { 40% { transform: translateY(-8%); } }
