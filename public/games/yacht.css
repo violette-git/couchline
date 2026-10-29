@@ -1,0 +1,40 @@
+.g-yacht { gap: 1.25rem; }
+@container (min-width: 760px) {
+  .g-yacht { grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: 2rem; }
+  .g-yacht .yc-top { position: sticky; top: 1rem; padding-top: 2.5rem; }
+  .g-yacht .yc-card-wrap { width: clamp(21rem, 44cqw, 30rem); }
+}
+.yc-top { display: grid; justify-items: center; gap: 0.9rem; width: 100%; }
+.yc-dice { display: flex; justify-content: center; gap: clamp(0.4rem, 2cqw, 0.8rem); padding: 0.9rem clamp(0.6rem, 3cqw, 1.1rem); border-radius: var(--r-large); background: radial-gradient(130% 120% at 50% 0%, #1B3A2C, #10241B); box-shadow: inset 0 0 0 1px #24493A, inset 0 6px 18px rgb(0 0 0 / 0.35); }
+.yc-dice .g-die { --s: clamp(2.7rem, 2rem + 4cqw, 3.6rem); }
+.yc-dice.is-idle .g-die { opacity: 0.4; filter: saturate(0.4); }
+.yc-dice.is-holdable .g-die { cursor: pointer; }
+.yc-hint { font-size: 0.82rem; }
+.yc-controls .btn { min-width: 12rem; }
+.yc-log { min-height: 1.3em; }
+
+.yc-card-wrap { width: min(100%, 30rem); overflow-x: auto; border-radius: var(--r-medium); background: var(--night-2); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-2); }
+.yc-card { width: 100%; border-collapse: collapse; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+.yc-card th, .yc-card td { height: 2.35rem; padding: 0 0.35rem; border-bottom: 1px solid #1C1F28; text-align: center; }
+.yc-card thead th { height: 2.6rem; font-size: 0.8rem; font-weight: 650; color: var(--paper-2); border-bottom: 1px solid var(--line-2); max-width: 5.5rem; }
+.yc-card thead th .dot { display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.3rem; border-radius: 50%; background: var(--c); vertical-align: 0.05em; }
+.yc-name { display: inline-block; max-width: 4.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.yc-card thead th.is-turn { color: var(--paper); box-shadow: inset 0 -2px 0 var(--c); }
+.yc-box { text-align: left !important; padding-left: 0.8rem !important; font-weight: 550; color: var(--paper-2); white-space: nowrap; }
+.yc-card td { color: var(--paper); font-weight: 600; min-width: 2.6rem; }
+.yc-card td.is-turn { background: color-mix(in srgb, var(--c) 6%, transparent); }
+.yc-card td.is-fresh { animation: yc-fresh 1.4s var(--ease-out); }
+.yc-card tr:nth-child(6) > *, .yc-card .yc-upperBonus > *, .yc-card .yc-yachtBonus > * { border-bottom-color: var(--line-2); }
+.yc-sum th, .yc-sum td { font-size: 0.8rem; color: var(--muted); font-weight: 600; background: rgb(255 255 255 / 0.015); }
+.yc-sum .yc-to { color: var(--faint); font-weight: 500; }
+.yc-total th, .yc-total td { height: 2.8rem; font-size: 1rem; color: var(--paper); font-weight: 750; border-bottom: 0; }
+.yc-total td { color: var(--c); }
+.yc-pick { width: 100%; max-width: 3.4rem; min-height: 1.9rem; padding: 0 0.3rem; border-radius: 7px; border: 1px dashed color-mix(in srgb, var(--c) 70%, transparent); background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--paper); font-weight: 700; font-size: 0.9rem; font-variant-numeric: tabular-nums;
+  transition: background-color var(--t-fast), transform var(--t-fast) var(--ease-out); }
+.yc-pick:hover { background: color-mix(in srgb, var(--c) 26%, transparent); border-style: solid; }
+.yc-pick:active { transform: scale(0.94); }
+.yc-pick.is-zero { border-color: var(--line-4); background: transparent; color: var(--faint); }
+.yc-could { color: var(--faint) !important; font-weight: 500 !important; font-style: italic; }
+@keyframes yc-fresh { from { background: color-mix(in srgb, var(--c) 40%, transparent); } }
+@media (max-width: 420px) { .yc-card th, .yc-card td { padding: 0 0.2rem; } .yc-box { padding-left: 0.55rem !important; } }
+@media (prefers-reduced-motion: reduce) { .yc-card td.is-fresh { animation: none; } }
