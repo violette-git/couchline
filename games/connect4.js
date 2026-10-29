@@ -1,4 +1,4 @@
-// Four in a Row: seven columns, six rows, discs fall to the bottom.
+// Connect Four: seven columns, six rows, discs fall to the bottom.
 import { Nope, int } from './util.js';
 
 export const COLS = 7;

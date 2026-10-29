@@ -1,4 +1,4 @@
-// Tic-tac-toe, Four in a Row, Rock Paper Scissors, and Hangman.
+// Tic-tac-toe, Connect Four, Rock Paper Scissors, and Hangman.
 import assert from 'node:assert/strict';
 import { play } from './harness.js';
 import { checker } from '../helpers.js';
@@ -30,7 +30,7 @@ g = play('connect4');
 for (const col of [0, 1, 1, 2, 2, 3, 2, 3, 3, 6]) g.move(g.state.turn, { col });
 g.move('p1', { col: 3 });
 assert.deepEqual(g.state.result?.winners, ['p1'], 'diagonals count');
-check.ok('four in a row: discs fall, full columns, across and diagonal wins');
+check.ok('connect four: discs fall, full columns, across and diagonal wins');
 
 g = play('rps', 2, { bestOf: 3 });
 g.move('p1', { pick: 'rock' });

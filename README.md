@@ -60,16 +60,16 @@ The **Games** tab has 27 games everyone in the room plays together. Pick one and
 
 | Kind | Games |
 | --- | --- |
-| Board | Tic-tac-toe, Four in a Row, Checkers, Chess, Reversi, Five in a Row, Mancala, Sea Battle, Dots and Boxes |
-| Word | Hangman, Word Race, Word Scramble, Draw and Guess |
+| Board | Tic-tac-toe, Connect Four, Checkers, Chess, Othello, Five in a Row, Mancala, Battleship, Dots and Boxes |
+| Word | Hangman, Wordle, Word Scramble, Pictionary |
 | Party | Trivia, Emoji Movies, Would You Rather, Rock Paper Scissors, Fastest Finger |
-| Cards and dice | Yacht Dice, Pig, Snakes and Ladders, Blackjack, Crazy Eights, Memory |
-| Puzzles together | Sudoku, Minesweeper, Code Breaker |
+| Cards and dice | Yahtzee, Pig, Snakes and Ladders, Blackjack, Crazy Eights, Memory |
+| Puzzles together | Sudoku, Minesweeper, Mastermind |
 
 - The server is the referee. It checks every move and sends each person only what they may see, so a hidden word, a hand of cards, or a fleet never reaches anyone else's browser.
 - People in the room who aren't playing watch. Games marked for it (the word, party, and puzzle games) take players who join mid-game.
 - When a game ends: Play again (whoever went first goes last), Change players, or pick another. Wins are counted in the Games tab for as long as the room lasts.
-- Search the tab by name or by the name you know it by (Connect 4, Battleship, Yahtzee, Pictionary, Mastermind, and so on).
+- Search the tab by name or by another name for it (Connect 4, Reversi, Noughts and Crosses, Kalah, Concentration, and so on).
 - To add a game, see [games/README.md](games/README.md).
 
 Up next has three ways to add something (paste a link, pick a file, type a show), and every source is listed under the link box with how to get its link.

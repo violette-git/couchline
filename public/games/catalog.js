@@ -25,7 +25,7 @@ export const CATALOG = [
     icon: '<path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>',
   },
   {
-    id: 'connect4', name: 'Four in a Row', aka: ['connect four', 'connect 4'], category: 'board', min: 2, max: 2,
+    id: 'connect4', name: 'Connect Four', aka: ['connect 4', 'four in a row'], category: 'board', min: 2, max: 2,
     blurb: 'Drop discs, line up four.',
     rules: 'Take turns dropping a disc into a column. It falls to the lowest open spot. Line up four of yours across, down, or diagonally to win.',
     icon: `<rect x="3" y="5" width="18" height="14" rx="2"/>${[8, 12, 16].map((x) => `<circle cx="${x}" cy="10" r="1.5"/><circle cx="${x}" cy="14.5" r="1.5"/>`).join('')}`,
@@ -43,7 +43,7 @@ export const CATALOG = [
     icon: '<circle cx="12" cy="6.5" r="2.5"/><path d="M9.5 10.5h5M10.5 10.5c0 3-1 5.5-2.5 7.5h8c-1.5-2-2.5-4.5-2.5-7.5M6.5 20.5h11"/>',
   },
   {
-    id: 'reversi', name: 'Reversi', aka: ['othello'], category: 'board', min: 2, max: 2,
+    id: 'reversi', name: 'Othello', aka: ['reversi'], category: 'board', min: 2, max: 2,
     blurb: 'Outflank and flip.',
     rules: 'Place a disc so it traps a line of the other player’s discs between yours, and those flip to your color. If you can’t move, you pass. When neither can move, the most discs wins.',
     icon: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/>',
@@ -61,7 +61,7 @@ export const CATALOG = [
     icon: `<rect x="2.5" y="7" width="19" height="10" rx="5"/>${[9, 12, 15].map((x) => `<circle cx="${x}" cy="10" r="1.2"/><circle cx="${x}" cy="14" r="1.2"/>`).join('')}`,
   },
   {
-    id: 'battleship', name: 'Sea Battle', aka: ['battleship', 'battleships'], category: 'board', min: 2, max: 2,
+    id: 'battleship', name: 'Battleship', aka: ['battleships', 'sea battle'], category: 'board', min: 2, max: 2,
     blurb: 'Find their fleet first.',
     rules: 'Each of you gets a hidden fleet of five ships. Take turns firing at a square of the other’s waters. A hit lets you fire again. Sink every ship to win.',
     icon: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
@@ -86,7 +86,7 @@ export const CATALOG = [
     icon: '<path d="M5 21h10M8 21V3h8v3"/><circle cx="16" cy="8.5" r="2.5"/><path d="M16 11v5M13.5 13h5"/>',
   },
   {
-    id: 'wordrace', name: 'Word Race', aka: ['wordle', 'five letters'], category: 'word', min: 1, max: 8, lateJoin: true,
+    id: 'wordrace', name: 'Wordle', aka: ['word race', 'five letters'], category: 'word', min: 1, max: 8, lateJoin: true,
     blurb: 'Same word, six guesses each.',
     rules: 'Everyone gets the same hidden five letter word and six guesses. Green is the right letter in the right spot, yellow is in the word somewhere. You see each other’s colors but not their letters. Fewest guesses wins; ties go to whoever was faster.',
     icon: [2, 6.2, 10.4, 14.6, 18.8].map((x, i) => `<rect x="${x}" y="9" width="3.2" height="6" rx="0.8"${i % 2 ? '' : ' fill="currentColor"'}/>`).join(''),
@@ -99,7 +99,7 @@ export const CATALOG = [
     icon: '<path d="M3 7h3c4 0 6 10 10 10h4M3 17h3c1.7 0 3-1.8 4.2-4M14 7h6M17 4l3 3-3 3M17 14l3 3-3 3"/>',
   },
   {
-    id: 'draw', name: 'Draw and Guess', aka: ['pictionary', 'sketch', 'drawing'], category: 'word', min: 2, max: 8, lateJoin: true,
+    id: 'draw', name: 'Pictionary', aka: ['draw and guess', 'sketch', 'drawing'], category: 'word', min: 2, max: 8, lateJoin: true,
     blurb: 'One draws, everyone guesses.',
     rules: 'Players take turns drawing a secret word while everyone else types guesses. Guess sooner for more points; the artist scores when people get it. Most points after everyone has drawn wins.',
     options: [
@@ -148,9 +148,9 @@ export const CATALOG = [
 
   // ---------- cards and dice ----------
   {
-    id: 'yacht', name: 'Yacht Dice', aka: ['yahtzee', 'yacht', 'poker dice', 'five dice'], category: 'cards', min: 1, max: 6,
+    id: 'yacht', name: 'Yahtzee', aka: ['yacht', 'poker dice', 'five dice'], category: 'cards', min: 1, max: 6,
     blurb: 'Five dice, thirteen boxes.',
-    rules: 'On your turn roll five dice up to three times, holding any you like between rolls, then score them in one empty box on your card. Five of a kind is a Yacht for 50. Top section of 63 or more earns 35 more. Highest total after 13 turns wins.',
+    rules: 'On your turn roll five dice up to three times, holding any you like between rolls, then score them in one empty box on your card. Five of a kind is a Yahtzee for 50. Top section of 63 or more earns 35 more. Highest total after 13 turns wins.',
     icon: `<rect x="4" y="4" width="16" height="16" rx="3"/>${dot(8.5, 8.5)}${dot(15.5, 8.5)}${dot(12, 12)}${dot(8.5, 15.5)}${dot(15.5, 15.5)}`,
   },
   {
@@ -203,7 +203,7 @@ export const CATALOG = [
     icon: '<circle cx="12" cy="13" r="6"/><path d="M12 3v3M3 13h3M18 13h3M5.6 6.6l2 2M18.4 6.6l-2 2"/>',
   },
   {
-    id: 'codebreaker', name: 'Code Breaker', aka: ['mastermind', 'bulls and cows'], category: 'puzzle', min: 1, max: 8, coop: true, lateJoin: true,
+    id: 'codebreaker', name: 'Mastermind', aka: ['code breaker', 'bulls and cows'], category: 'puzzle', min: 1, max: 8, coop: true, lateJoin: true,
     blurb: 'Crack the color code.',
     rules: 'Couchline hides a code of colored pegs. Build a guess together; anyone can submit it. Black means right color, right spot. White means right color, wrong spot. Crack it within ten guesses.',
     options: [{ key: 'length', label: 'Code length', choices: [{ value: 4, label: '4 pegs' }, { value: 5, label: '5 pegs' }] }],

@@ -1,4 +1,4 @@
-// Four in a Row: tap a column to drop a disc. Discs are in their player's color.
+// Connect Four: tap a column to drop a disc. Discs are in their player's color.
 import { tint } from './kit.js';
 
 const COLS = 7;
