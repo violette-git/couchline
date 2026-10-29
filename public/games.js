@@ -6,6 +6,7 @@
 // played. See games/README.md for how a game is put together.
 import { $, el, colorOf, toast } from './ui.js';
 import { CATALOG, CATEGORIES, GAME } from './games/catalog.js';
+import { sound } from './games/sound.js';
 
 const icon = (meta, cls = 'g-icon') => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -34,7 +35,7 @@ export function initGames({ socket, clientId, getRoom, now }) {
   let timerRaf = null;
 
   const ask = (event, data = {}) => new Promise((res) => socket.emit(event, data, (r) => {
-    if (r?.error) toast({ text: r.error });
+    if (r?.error) { toast({ text: r.error }); sound.play('nope'); }
     res(r || {});
   }));
   const isPlayer = () => !!game?.players.some((p) => p.id === clientId);
@@ -235,7 +236,10 @@ export function initGames({ socket, clientId, getRoom, now }) {
       if (!dl) return;
       const left = Math.max(0, Math.ceil((dl - now()) / 1000));
       const t = String(left);
-      if (pill.textContent !== t) pill.textContent = t;
+      if (pill.textContent !== t) {
+        if (pill.textContent && left <= 3 && left > 0) sound.play('tick');
+        pill.textContent = t;
+      }
       pill.classList.toggle('is-low', left <= 5);
       timerRaf = requestAnimationFrame(step);
     };
@@ -302,6 +306,41 @@ export function initGames({ socket, clientId, getRoom, now }) {
   }
 
   $('#gameRulesBtn').addEventListener('click', () => { showRules = !showRules; render(); });
+
+  // ---------- sounds ----------
+  // A tap for every button press in a game (and typing on a computer keyboard during one).
+  wrap.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (b && !b.disabled && b.id !== 'gameSound') sound.play('tap');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (game?.phase !== 'play' || game.result || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.closest('input, textarea, select, button')) return;
+    if (/^[a-z]$/i.test(e.key) || e.key === 'Enter' || e.key === 'Backspace') sound.play('tap');
+  });
+  function renderSoundBtn() {
+    const b = $('#gameSound');
+    b.setAttribute('aria-pressed', String(!sound.muted));
+    b.setAttribute('aria-label', sound.muted ? 'Turn game sounds on' : 'Turn game sounds off');
+    b.title = sound.muted ? 'Sounds off' : 'Sounds on';
+    b.classList.toggle('is-muted', sound.muted);
+  }
+  $('#gameSound').addEventListener('click', () => { sound.setMuted(!sound.muted); renderSoundBtn(); });
+  renderSoundBtn();
+  // The moments that get their own sound: a game starting, your turn coming round, and the end.
+  function cue(was, now) {
+    if (!now || now.phase !== 'play') return;
+    const fresh = was?.id !== now.id || was?.round !== now.round || was?.phase !== 'play';
+    if (fresh) { sound.play('start'); return; }
+    if (now.result && !was.result) {
+      const meta = GAME[now.type];
+      const mine = now.players.some((p) => p.id === clientId);
+      const won = meta.coop ? !!now.result.winners?.length : now.result.winners?.includes(clientId);
+      sound.play(!mine ? 'end' : won ? 'win' : 'lose');
+      return;
+    }
+    if (!now.result && now.turn === clientId && was.turn !== clientId) sound.play('turn');
+  }
   $('#gameJoin').addEventListener('click', () => ask('game:seat', { on: true }));
   $('#gameEnd').addEventListener('click', () => ask('game:close'));
   $('#gameNowGo').addEventListener('click', () => { $('#stage').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
@@ -312,6 +351,7 @@ export function initGames({ socket, clientId, getRoom, now }) {
     onGame(g) {
       const was = game;
       game = g;
+      cue(was, g);
       if (!g || g.id !== was?.id) showRules = false;
       render();
       renderList();

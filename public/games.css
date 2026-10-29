@@ -249,3 +249,10 @@ button.g-card:disabled { cursor: default; }
 .stage.has-float .pip-resize { display: block; position: absolute; right: 0; bottom: 0; z-index: 3; width: 24px; height: 24px; cursor: nwse-resize; touch-action: none;
   background: linear-gradient(135deg, transparent 52%, rgb(243 244 247 / 0.65) 52% 58%, transparent 58% 68%, rgb(243 244 247 / 0.65) 68% 74%, transparent 74%); }
 @media (prefers-reduced-motion: reduce) { .stage.is-gaming.has-float > #playerWrap, .game-video-panel { animation: none; } }
+
+/* The game sounds switch, in the game bar. */
+.g-sound { padding-inline: 0.55rem; }
+.g-sound svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.g-sound .g-sound-off, .g-sound.is-muted .g-sound-on { display: none; }
+.g-sound.is-muted .g-sound-off { display: inline; }
+.g-sound.is-muted { color: var(--faint); }

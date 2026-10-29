@@ -69,6 +69,7 @@ The **Games** tab has 27 games everyone in the room plays together. Rooms don't 
 
 - The server is the referee. It checks every move and sends each person only what they may see, so a hidden word, a hand of cards, or a fleet never reaches anyone else's browser.
 - **A video during a game:** tap **Video** in the game's bar to paste a link (or show what's already on). It plays for everyone, in sync, in a small window over the game. Each person drags it anywhere on their own screen and resizes it from the corner (double-click its bar to put it back); the spot is remembered on that device. A video showing this way keeps playing when the next game opens. Hiding it (the ✕) hides and pauses it for everyone.
+- **Sounds:** soft taps on every button press in a game, a thud when a move isn't allowed, a chime when it's your turn, little tunes to start and finish, and ticks in a timer's last three seconds. They're made in the browser (no sound files). The speaker button in the game's bar turns them off, remembered on that device.
 - People in the room who aren't playing watch. Games marked for it (the word, party, and puzzle games) take players who join mid-game.
 - When a game ends: Play again (whoever went first goes last), Change players, or pick another. Wins are counted in the Games tab for as long as the room lasts.
 - Search the tab by name or by another name for it (Connect 4, Reversi, Noughts and Crosses, Kalah, Concentration, and so on).
