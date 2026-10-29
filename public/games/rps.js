@@ -29,13 +29,13 @@ export default function mount(root, api) {
         type: 'button', class: `g-choice rps-choice${mine === p.id ? ' is-picked' : ''}`, disabled: !playing || !!mine,
         onclick: () => api.send({ pick: p.id }),
       }, el('span', { class: 'rps-glyph' }, p.glyph), p.label)));
-      root.replaceChildren(
+      root.replaceChildren(...[
         el('p', { class: 'g-note' }, `Best of ${s.bestOf}. First to ${Math.ceil(s.bestOf / 2)}.`),
         scoreboard(game.players, s.wins, { me: api.me }),
         reveal || el('p', { class: 'g-big rps-wait' }, 'Ready?'),
         last ? el('p', { class: 'g-note' }, last.winner ? `${api.name(last.winner)} ${last.winner === api.me ? 'win' : 'wins'} round ${s.rounds.length}` : `Round ${s.rounds.length} was a tie`) : null,
         game.result ? null : choices,
-      );
+      ].filter(Boolean));
       if (game.result) return;
       const waitingOn = game.players.filter((p) => !s.picks[p.id]).map((p) => p.id);
       if (!api.isPlayer()) return { text: waitingOn.length === 2 ? 'Both are picking' : `Waiting on ${api.name(waitingOn[0])}` };

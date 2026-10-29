@@ -60,7 +60,7 @@ export default function mount(root, api) {
       words.push(cur);
       const last = s.log.at(-1);
       const lastLine = last ? `${api.name(last.by)} ${last.letter ? `tried ${last.letter.toUpperCase()}` : `guessed “${last.word}”`}: ${last.right ? 'yes!' : 'no.'}` : '';
-      root.replaceChildren(
+      root.replaceChildren(...[
         el('div', { class: 'hm-top' },
           drawing(s.wrong, over && !game.result.winners?.length),
           el('div', { class: 'hm-side' },
@@ -71,7 +71,7 @@ export default function mount(root, api) {
         el('div', { class: 'hm-word', 'aria-label': 'The word so far' }, ...words.map((w) => el('span', { class: 'hm-w' }, ...w))),
         canGuess ? keyboard((l) => api.send({ letter: l }), { states, disabled: !canGuess }) : null,
         canGuess ? answerBox((word) => api.send({ word }), { placeholder: 'Know it? Guess the whole thing', button: 'Guess', maxlength: 40 }) : null,
-      );
+      ].filter(Boolean));
       if (over) return undefined;
       if (s.setter === api.me) return { text: 'They’re guessing your word' };
       return canGuess ? { text: 'Guess a letter', color: 'me' } : { text: 'Guessing together' };
