@@ -53,6 +53,18 @@ await wait(100);
 assert.deepEqual(reacts.map((x) => x.jinx), [false, true]);
 check.ok('the same reaction from both within two seconds is a jinx');
 
+// The longer row of reactions: any on the list goes through; anything else is dropped.
+reacts.length = 0;
+await wait(350); // one reaction per person every 300ms
+a.emit('react', { emoji: '🍿' });
+await wait(350);
+a.emit('react', { emoji: '❤️' });
+await wait(350);
+a.emit('react', { emoji: '🦄' });
+await wait(150);
+assert.deepEqual(reacts.map((x) => x.emoji), ['🍿', '❤️']);
+check.ok('every reaction on the list goes through, and only those');
+
 // Ready check: both tap Ready, the countdown starts by itself.
 a.emit('ready:toggle'); await wait(50);
 assert.deepEqual(b.last.ready.ids, ['ana']);

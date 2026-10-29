@@ -15,8 +15,8 @@ import { initSocial } from './social.js';
 import { initAdding, handleShareLanding } from './adding.js';
 import { initCreate, initBrowse, pendingRoom } from './rooms.js';
 import { initGames, renderShelf } from './games.js';
+import { REACTIONS } from './reactions.js';
 
-const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
 const WORDS_A = ['maple', 'velvet', 'quiet', 'amber', 'cozy', 'late', 'lucky', 'sunny', 'hazel', 'cobalt'];
 const WORDS_B = ['couch', 'otter', 'lamp', 'porch', 'comet', 'pillow', 'fox', 'lantern', 'sofa', 'moth'];
 
@@ -1086,6 +1086,20 @@ $('#camBtn').addEventListener('click', (e) => { e.target.textContent = call.togg
 $('#reactions').append(...REACTIONS.map((emoji) => el('button', {
   class: 'react-btn', 'aria-label': `React ${emoji}`, onclick: () => socket?.emit('react', { emoji }),
 }, emoji)));
+// The row scrolls sideways. A mouse wheel scrolls it too, and the edges fade while there's more.
+function reactionEdges() {
+  const r = $('#reactions');
+  r.classList.toggle('more-left', r.scrollLeft > 4);
+  r.classList.toggle('more-right', r.scrollLeft + r.clientWidth < r.scrollWidth - 4);
+}
+$('#reactions').addEventListener('scroll', reactionEdges, { passive: true });
+$('#reactions').addEventListener('wheel', (e) => {
+  const r = e.currentTarget;
+  if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || r.scrollWidth <= r.clientWidth) return;
+  e.preventDefault();
+  r.scrollLeft += e.deltaY;
+}, { passive: false });
+new ResizeObserver(reactionEdges).observe($('#reactions'));
 
 function floatReaction({ emoji, color, jinx }) {
   const layer = $('#reactLayer');

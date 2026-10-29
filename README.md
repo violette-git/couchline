@@ -47,6 +47,7 @@ The free quota allows about 100 searches a day; results are cached for 10 minute
 - **Ready check:** everyone taps I'm ready, and when the last person does, the countdown starts by itself.
 - **Rate it together:** when something you watched ends, you each rate it; the scores reveal at the same time and go into the Watched tab.
 - **Played:** everything that was on stays at the bottom of Up next, newest first, with Play again and Add back. Files from your device too.
+- **Reactions:** 40 of them in a row under the video that scrolls sideways (a mouse wheel scrolls it too), with the six favorites first.
 - **Jinx:** send the same reaction at the same moment and it bursts.
 - **Stepped away:** the roster shows who has switched away from Couchline. Turn on "Pause when someone steps away" in the room menu to pause after 8 seconds.
 - **Swipe together:** a deck of Instagram reels and TikToks everyone swipes through as one. Whoever swipes is driving and everyone's screen follows. Reels and TikToks already in Up next move into the deck, and anything shared while it's on (phone share sheet, Paste, chat) joins it. Each person taps the video to play it.
@@ -70,7 +71,7 @@ The **Games** tab has 27 games everyone in the room plays together. Rooms don't 
 - People in the room who aren't playing watch. Games marked for it (the word, party, and puzzle games) take players who join mid-game.
 - When a game ends: Play again (whoever went first goes last), Change players, or pick another. Wins are counted in the Games tab for as long as the room lasts.
 - Search the tab by name or by another name for it (Connect 4, Reversi, Noughts and Crosses, Kalah, Concentration, and so on).
-- Hangman's word comes from Couchline (pick a topic in the lobby) or from the first player, who types the word and a topic for everyone to see as a clue.
+- Hangman gives eight misses. The word comes from Couchline (pick a topic in the lobby) or from the first player, who types the word, a topic everyone sees, and optionally a hint. Once a game, anyone guessing can open the hint (with Couchline's words, it shows a letter). Curly apostrophes and long dashes from phone keyboards work like ' and -.
 - To add a game, see [games/README.md](games/README.md).
 
 Up next has three ways to add something (paste a link, pick a file, type a show), and every source is listed under the link box with how to get its link.

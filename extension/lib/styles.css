@@ -688,11 +688,16 @@ a.brand:hover { opacity: 0.8; }
 }
 
 .start-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0 1rem; }
-.reactions { display: flex; gap: 0.4rem; padding: 0.35rem 1rem; margin-block: -0.35rem; overflow-x: auto; scrollbar-width: none; }
+/* One row that scrolls sideways; the edges fade while there are more reactions that way. */
+.reactions { display: flex; gap: 0.4rem; padding: 0.35rem 1rem; margin-block: -0.35rem; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; scroll-padding-inline: 1rem; overscroll-behavior-x: contain; }
+.reactions::-webkit-scrollbar { display: none; }
+.reactions .react-btn { scroll-snap-align: start; }
+.reactions.more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); }
+.reactions.more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 56px); mask-image: linear-gradient(to right, transparent, #000 56px); }
+.reactions.more-left.more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent); }
 .react-btn { font-size: 1.375rem; line-height: 1; width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border-radius: 12px; border: 1px solid transparent; background: var(--s2); flex: none; box-shadow: inset 0 1px 0 var(--edge); transition: transform var(--t-med) var(--ease-pop), background-color var(--t-fast) ease-out, border-color var(--t-fast) ease-out; }
 @media (hover: hover) { .react-btn:hover { transform: translateY(-3px) scale(1.06); background: var(--night-3); } }
 .react-btn:active { transform: scale(0.86); transition-duration: 80ms; }
-@media (max-width: 479px) { .reactions { justify-content: space-between; } }
 @media (max-width: 379px) { .reactions { gap: 0.25rem; } .react-btn { width: 44px; height: 44px; font-size: 1.3rem; } }
 
 /* ---------- call ---------- */
@@ -756,7 +761,7 @@ a.brand:hover { opacity: 0.8; }
 .is-full .call-bar .btn, .is-full .call-bar .seg, .is-full .quick-chat input, .is-full .quick-chat .btn, .is-full .react-btn { background: var(--glass); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .is-full .call-bar .btn:hover, .is-full .quick-chat .btn:hover, .is-full .react-btn:hover { background: rgb(31 35 45 / 0.9); }
 .is-full .quick-chat { position: fixed; z-index: 8; left: calc(0.75rem + env(safe-area-inset-left)); bottom: var(--stack-base); width: min(26rem, 62vw); padding: 0; }
-.is-full .reactions { position: fixed; z-index: 8; right: calc(0.75rem + env(safe-area-inset-right)); bottom: calc(var(--stack-base) + var(--stack) - 0.35rem); padding: 0.35rem 0; margin: 0; }
+.is-full .reactions { position: fixed; z-index: 8; right: calc(0.75rem + env(safe-area-inset-right)); bottom: calc(var(--stack-base) + var(--stack) - 0.35rem); padding: 0.35rem 0; margin: 0; max-width: min(70vw, 30rem); }
 .is-full .ready-row { position: fixed; z-index: 8; top: auto; left: calc(0.75rem + env(safe-area-inset-left)); bottom: calc(var(--stack-base) + var(--stack) + 3.25rem); max-width: min(30rem, calc(100vw - 1.5rem)); padding: 0.35rem 0.85rem 0.35rem 0.35rem; border-radius: var(--r-large); background: var(--glass); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: var(--shadow-2); }
 .is-full .quick-typing { position: fixed; z-index: 8; left: 1rem; bottom: calc(var(--stack-base) + var(--stack) + var(--ready) + 3rem); margin: 0; padding: 0; }
 .is-full .rate-card { position: fixed; z-index: 9; left: 0; right: 0; margin-inline: auto; bottom: calc(var(--stack-base) + var(--stack) + var(--ready) + 3.75rem); width: min(30rem, calc(100vw - 1.5rem)); box-shadow: var(--shadow-3); }

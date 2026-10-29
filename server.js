@@ -12,6 +12,7 @@ import { Server } from 'socket.io';
 import { parseMedia, mediaWarnings, IN_BOX, EXT_SERVICES } from './public/media.js';
 import { createGames } from './games/engine.js';
 import { GAME } from './public/games/catalog.js';
+import { REACTIONS } from './public/reactions.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -22,7 +23,6 @@ const MEMBER_COLORS = ['lamp', 'rose', 'sky', 'mint', 'lilac', 'lime', 'orchid',
 // people with a camera are on video; anyone past that is on audio until a spot opens.
 const VIDEO_SLOTS = 5;
 const SERVICES = ['Netflix', 'Hulu', 'Other'];
-const REACTIONS = ['😂', '😮', '😭', '😍', '👀', '🙌'];
 // Twitch only plays inside pages on the domains listed here (comma separated, no scheme or port).
 const TWITCH_PARENT = (process.env.TWITCH_PARENT || 'localhost').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 // Optional: a YouTube Data API key turns on YouTube search inside Couchline.

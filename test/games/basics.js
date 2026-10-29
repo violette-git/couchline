@@ -55,10 +55,13 @@ for (const l of letters) g.move('p1', { letter: l });
 assert.deepEqual(g.state.result.winners, ['p1', 'p2']);
 g = play('hangman', 2, { from: 'random' });
 assert.ok(['Movies and TV', 'Animals', 'Food', 'Everyday things'].includes(g.view('p2').topic), 'a mixed pick says which list it came from');
-for (const l of 'qxzjvkwy') { if (g.state.result) break; if (!g.state.word.toLowerCase().includes(l)) g.move('p2', { letter: l }); }
-g.state.wrong = 5;
+for (const l of 'qxz') { if (!g.state.word.toLowerCase().includes(l)) g.move('p2', { letter: l }); }
+g.state.wrong = 6;
 g.move('p1', { word: 'definitely not it' });
-assert.deepEqual(g.state.result.winners, [], 'six misses and the word wins');
+assert.equal(g.state.result, null, 'seven misses is still going');
+g.move('p1', { word: 'still not it' });
+assert.deepEqual(g.state.result.winners, [], 'eight misses and the word wins');
+assert.equal(g.view('p1').max, 8);
 g = play('hangman', 2, { from: 'player' });
 g.refused('p2', { letter: 'a' });
 g.refused('p1', { word: 'x1' });
@@ -71,8 +74,9 @@ g.move('p2', { word: 'popcorn time' });
 assert.ok(g.state.result.winners.length);
 g = play('hangman', 2, { from: 'player' });
 assert.equal(g.view('p2').topic, null);
-g.move('p1', { word: 'Paddington', topic: '  A   bear   who loves marmalade, from Peru  ' });
-assert.equal(g.view('p2').topic, 'A bear who loves marmalade, fr', 'the chooser’s topic is tidied and kept short');
+const long = 'A bear from darkest Peru who loves marmalade sandwiches and lives with a family in London';
+g.move('p1', { word: 'Paddington', topic: `  ${long.replace(/ /g, '   ')}  ` });
+assert.equal(g.view('p2').topic, long, 'a long topic is kept whole, with its spacing tidied');
 assert.ok(!g.view('p2').topic.toLowerCase().includes('paddington'));
 g = play('hangman', 2, { from: 'player' });
 g.move('p1', { word: 'Paddington', topic: '   ' });
@@ -81,5 +85,45 @@ g = play('hangman', 2, { from: 'player' });
 g.move('p1', { word: 'Paddington', topic: { not: 'text' } });
 assert.equal(g.view('p2').topic, null, 'a topic that isn’t text is ignored');
 check.ok('hangman: hidden word, letters, whole-word guesses, chosen words and their topics');
+
+// Hints: the chooser's stays hidden until opened; Couchline's is a letter. Once a game.
+g = play('hangman', 3, { from: 'player' });
+g.move('p1', { word: 'Paddington', topic: 'Movies', hint: 'He has a hat and a suitcase' });
+assert.equal(g.view('p2').hint, null, 'the hint is hidden until someone opens it');
+assert.equal(g.view('p2').hintReady, true);
+assert.equal(g.view('p1').hint, 'He has a hat and a suitcase', 'the chooser sees their own hint');
+g.refused('p1', { hint: true });
+g.move('p2', { hint: true });
+assert.equal(g.view('p3').hint, 'He has a hat and a suitcase', 'once opened, everyone sees it');
+assert.equal(g.view('p3').hintReady, false);
+assert.equal(g.state.wrong, 0, 'opening the hint doesn’t cost a miss');
+assert.match(g.refused('p3', { hint: true }), /already/);
+g = play('hangman', 2, { from: 'player' });
+g.move('p1', { word: 'Paddington' });
+assert.equal(g.view('p2').hintReady, false);
+assert.match(g.refused('p2', { hint: true }), /no hint/);
+g = play('hangman', 1, { from: 'random' });
+const before = g.state.guessed.length;
+g.move('p1', { hint: true });
+assert.equal(g.state.guessed.length, before + 1, 'Couchline’s hint is one letter');
+const got = g.state.guessed.at(-1);
+assert.ok(g.state.word.toLowerCase().includes(got));
+assert.equal(g.view('p1').hint, `There’s ${/[aeiou]/.test(got) ? 'an' : 'a'} ${got.toUpperCase()}`);
+check.ok('hangman: hints, hidden until opened, once a game, and a free letter for Couchline’s words');
+
+// Phones type curly apostrophes and long dashes.
+g = play('hangman', 2, { from: 'player' });
+g.move('p1', { word: 'Schitt\u2019s Creek' });
+assert.equal(g.view('p1').word, "Schitt's Creek");
+assert.deepEqual(g.view('p2').mask.filter((c) => c && !/[a-z]/i.test(c)), ["'", ' '], 'the apostrophe shows from the start');
+g = play('hangman', 2, { from: 'player' });
+g.move('p1', { word: 'Spider\u2013Man' });
+assert.equal(g.view('p1').word, 'Spider-Man');
+g.move('p2', { word: 'spiderman' });
+assert.ok(g.state.result.winners.length, 'a whole-word guess doesn’t need the hyphen');
+g = play('hangman', 2, { from: 'player' });
+g.move('p1', { word: "Rock 'n' Roll" });
+assert.equal(g.view('p1').word, "Rock 'n' Roll");
+check.ok('hangman: apostrophes and hyphens, straight or curly, in chosen words');
 
 console.log(`\n${check.count} basic game checks passed\n`);
