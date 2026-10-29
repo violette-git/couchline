@@ -1,9 +1,9 @@
-// Starting a room (with a name, private or public) and browsing public rooms.
+// Starting a room (with a name, private or public, for watching or games) and browsing public rooms.
 import { $, el, colorOf, debounce, listNames } from './ui.js';
 
 const NEW_ROOM = 'couchline:newRoom';
 
-// What to set up once the creator is in the new room (name and privacy).
+// What to set up once the creator is in the new room (name, privacy, and what it's for).
 export const pendingRoom = {
   get(code) {
     try {
@@ -28,14 +28,27 @@ export function initCreate({ newRoomCode }) {
   };
   for (const b of form.querySelectorAll('[data-visibility]')) b.addEventListener('click', () => setVisibility(b.dataset.visibility));
   setVisibility('private');
+  let mode = 'watch';
+  const setMode = (m) => {
+    mode = m;
+    for (const b of form.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === m));
+    $('#createModeNote').textContent = m === 'games'
+      ? 'Opens to the games, with the call and chat beside them. You can still put a video on.'
+      : 'Opens to Up next, ready for a video or a show. The games are a tab away.';
+    $('#createTitle').placeholder = m === 'games' ? 'Thursday game night' : 'Friday movie night';
+  };
+  for (const b of form.querySelectorAll('[data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
+  setMode('watch');
   $('#createRoom').addEventListener('click', () => {
     form.hidden = !form.hidden;
     $('#createRoom').setAttribute('aria-expanded', String(!form.hidden));
     if (!form.hidden) $('#createTitle').focus();
   });
   // The other Start a room buttons on the home page open the same form, up in the hero.
+  // data-open-create="games" starts it set to games.
   for (const b of document.querySelectorAll('[data-open-create]')) {
     b.addEventListener('click', () => {
+      if (b.dataset.openCreate) setMode(b.dataset.openCreate);
       if (form.hidden) $('#createRoom').click();
       form.scrollIntoView({ behavior: 'smooth', block: 'center' });
       $('#createTitle').focus({ preventScroll: true });
@@ -44,7 +57,7 @@ export function initCreate({ newRoomCode }) {
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const code = newRoomCode();
-    pendingRoom.set({ code, title: $('#createTitle').value.trim().slice(0, 60), visibility });
+    pendingRoom.set({ code, title: $('#createTitle').value.trim().slice(0, 60), visibility, mode });
     location.href = `/r/${code}`;
   });
 }
@@ -86,7 +99,7 @@ export function initBrowse() {
             r.now && r.playing ? el('span', { class: 'room-live' }, 'Playing') : null),
           el('div', { class: 'room-card-text' },
             el('p', { class: 'room-card-title' }, r.title || r.id),
-            el('p', { class: 'room-card-now' }, r.game ? `Playing ${r.game}` : r.now ? `${label}: ${r.now.title}` : 'Nothing on yet'),
+            el('p', { class: 'room-card-now' }, r.game ? `Playing ${r.game}` : r.now ? `${label}: ${r.now.title}` : r.mode === 'games' ? 'Game night, picking a game' : 'Nothing on yet'),
             el('p', { class: 'room-card-people' },
               el('span', { class: 'room-dots', 'aria-hidden': 'true' }, ...r.people.slice(0, 8).map((p) => {
                 const d = el('span', { class: 'dot' });

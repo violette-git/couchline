@@ -49,7 +49,7 @@ if (handleShareLanding()) {
 } else if (routeMatch) {
   roomId = routeMatch[1].toLowerCase();
   $('#entryRoom').textContent = roomId;
-  for (const id of ['#roomCodeTop', '#roomMenuCode', '#emptyCode']) $(id).textContent = roomId;
+  for (const id of ['#roomCodeTop', '#roomMenuCode', '#emptyCode', '#pickCode']) $(id).textContent = roomId;
   // The extension page shows this room's code, and links back here.
   for (const a of document.querySelectorAll('.ext-room-link')) a.href = `/extension?room=${roomId}`;
   $('#name').value = store.get('name', '');
@@ -208,7 +208,7 @@ function enterRoom(opts) {
 // A saved copy of the room, so it comes back if the server restarts.
 function saveCache() {
   if (!room) return;
-  store.set(`room:${roomId}`, { title: room.title, visibility: room.visibility, current: room.current, queue: room.queue, played: room.played, shows: room.shows, history: room.history, chat: social.messages().slice(-100) });
+  store.set(`room:${roomId}`, { title: room.title, visibility: room.visibility, mode: room.mode, current: room.current, queue: room.queue, played: room.played, shows: room.shows, history: room.history, chat: social.messages().slice(-100) });
 }
 
 function onState(s) {
@@ -251,7 +251,7 @@ function renderRoomSettings() {
   $('#roomChip').classList.toggle('has-title', !!room.title);
   document.title = room.title ? `${room.title} on Couchline` : 'Couchline';
   // Only rewrite the name box when the name itself changes, so typing isn't interrupted.
-  const key = `${room.title}|${room.visibility}|${isHost}`;
+  const key = `${room.title}|${room.visibility}|${room.mode}|${isHost}`;
   if (key !== settingsKey) {
     settingsKey = key;
     if (document.activeElement !== $('#roomTitleInput')) $('#roomTitleInput').value = room.title || '';
@@ -262,6 +262,10 @@ function renderRoomSettings() {
     b.setAttribute('aria-pressed', String(b.dataset.roomVisibility === room.visibility));
     b.disabled = !isHost;
   }
+  for (const b of document.querySelectorAll('[data-room-mode]')) {
+    b.setAttribute('aria-pressed', String(b.dataset.roomMode === room.mode));
+    b.disabled = !isHost;
+  }
   const what = room.visibility === 'public'
     ? 'Public: listed in Browse rooms while someone is here. Anyone can join.'
     : 'Private: only people with the code or link can join.';
@@ -270,13 +274,16 @@ function renderRoomSettings() {
   const pending = pendingRoom.get(roomId);
   if (pending && isHost) {
     pendingRoom.clear();
-    if (pending.title || pending.visibility === 'public') socket.emit('room:settings', { title: pending.title, visibility: pending.visibility }, () => {});
+    if (pending.title || pending.visibility === 'public' || pending.mode === 'games') socket.emit('room:settings', { title: pending.title, visibility: pending.visibility, mode: pending.mode }, () => {});
   }
 }
 $('#roomSettings').addEventListener('submit', (e) => {
   e.preventDefault();
   socket.emit('room:settings', { title: $('#roomTitleInput').value }, (r) => { if (r?.error) toast({ text: r.error }); });
 });
+for (const b of document.querySelectorAll('[data-room-mode]')) {
+  b.addEventListener('click', () => socket.emit('room:settings', { mode: b.dataset.roomMode }, (r) => { if (r?.error) toast({ text: r.error }); }));
+}
 for (const b of document.querySelectorAll('[data-room-visibility]')) {
   b.addEventListener('click', () => socket.emit('room:settings', { visibility: b.dataset.roomVisibility }, (r) => { if (r?.error) toast({ text: r.error }); }));
 }

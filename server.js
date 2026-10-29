@@ -220,6 +220,8 @@ function getRoom(roomId) {
       // Title and who can find the room. Private rooms are joined by code or link only;
       // public rooms are listed in the directory while someone is in them.
       title: null, visibility: 'private', host: null,
+      // What the room is mainly for: watching, or games (then it opens to the game picker).
+      mode: 'watch',
       // The game everyone is playing (see games/engine.js), and wins so far.
       game: null, gameScores: {}, gameTimer: null,
     };
@@ -285,6 +287,7 @@ function publicState(room) {
     id: room.id,
     title: room.title,
     visibility: room.visibility,
+    mode: room.mode,
     host,
     hostName: room.members.get(host)?.name || null,
     current: room.current,
@@ -490,6 +493,7 @@ const cleanTitle = (t) => str(t, 60).replace(/\s+/g, ' ') || null;
 function adoptCache(room, cache) {
   room.title = cleanTitle(cache.title);
   room.visibility = cache.visibility === 'public' ? 'public' : 'private';
+  room.mode = cache.mode === 'games' ? 'games' : 'watch';
   const items = Array.isArray(cache.queue) ? cache.queue.slice(0, 100).map(cleanItem).filter(Boolean) : [];
   const shows = Array.isArray(cache.shows) ? cache.shows.slice(0, 50).map(cleanShow).filter(Boolean) : [];
   room.queue = items;
@@ -691,6 +695,7 @@ app.get('/api/rooms', (req, res) => {
       people: [...r.members.values()].filter((m) => !m.remote).map((m) => ({ name: m.name, color: m.color })),
       playing: r.playback.playing && Date.now() >= r.playback.at,
       game: r.game ? GAME[r.game.type].name : null,
+      mode: r.mode,
       now: r.current ? {
         title: r.current.title, kind: r.current.kind, service: r.current.service || null, videoId: r.current.videoId || null,
         thumb: r.current.thumb || null, poster: r.current.poster || null, live: !!r.current.live, channel: r.current.channel || null,
@@ -797,7 +802,7 @@ io.on('connection', (socket) => {
     if (!previous) toast(room, `${me.name} joined`, me);
   });
 
-  // The room's title and private or public. Only the host (or whoever stands in) can change them.
+  // The room's title, private or public, and watching or games. Only the host (or whoever stands in) can change them.
   on('room:settings', (d, cb) => {
     if (hostOf(room) !== me.id) return cb({ error: `Only ${room.members.get(hostOf(room))?.name || 'the host'} can change this.` });
     const changes = [];
@@ -807,6 +812,10 @@ io.on('connection', (socket) => {
         room.title = title;
         changes.push(title ? `named the room ${title}` : 'cleared the room name');
       }
+    }
+    if ('mode' in d && ['watch', 'games'].includes(d.mode) && d.mode !== room.mode) {
+      room.mode = d.mode;
+      changes.push(d.mode === 'games' ? 'made this a games room' : 'made this a watching room');
     }
     if ('visibility' in d && ['private', 'public'].includes(d.visibility) && d.visibility !== room.visibility) {
       room.visibility = d.visibility;

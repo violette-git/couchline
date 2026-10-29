@@ -1,5 +1,6 @@
 // Games: the Games tab (every game, searchable, and wins so far) and the game itself, which
-// takes over the stage for everyone while it's open. The server referees; this page shows
+// takes over the stage for everyone while it's open. Rooms made for games open to a picker
+// on the stage instead of an empty video spot, and come back to it when a game closes. The server referees; this page shows
 // the lobby, the board each game draws, and what happens when it ends.
 // Each game draws itself from public/games/<id>.js (and <id>.css), loaded the first time it's
 // played. See games/README.md for how a game is put together.
@@ -60,21 +61,27 @@ export function initGames({ socket, clientId, getRoom, now }) {
   }, c.label)));
   $('#gameSearch').addEventListener('input', () => renderList());
 
+  const tiles = (list) => list.map((g) => el('li', {},
+    el('button', { type: 'button', class: `g-tile${g.id === game?.type ? ' is-open' : ''}`, onclick: () => open(g.id) },
+      icon(g),
+      el('span', { class: 'g-tile-name' }, g.name),
+      el('span', { class: 'g-tile-blurb' }, g.blurb),
+      el('span', { class: 'g-tile-meta' }, `${players(g)}${g.coop ? ', together' : ''}`))));
+
   function renderList() {
     const q = fit($('#gameSearch').value);
     for (const b of $('#gameFilters').children) b.setAttribute('aria-pressed', String(b.dataset.filter === filter));
     const list = CATALOG.filter((g) => (filter === 'all' || g.category === filter)
       && (!q || [g.name, ...g.aka, g.blurb].some((s) => fit(s).includes(q))));
-    const openType = game?.type;
-    const tiles = list.map((g) => el('li', {},
-      el('button', { type: 'button', class: `g-tile${g.id === openType ? ' is-open' : ''}`, onclick: () => open(g.id) },
-        icon(g),
-        el('span', { class: 'g-tile-name' }, g.name),
-        el('span', { class: 'g-tile-blurb' }, g.blurb),
-        el('span', { class: 'g-tile-meta' }, `${players(g)}${g.coop ? ', together' : ''}`))));
-    $('#gameGrid').replaceChildren(...tiles);
+    $('#gameGrid').replaceChildren(...tiles(list));
     $('#gameNone').hidden = !!list.length;
   }
+
+  // The picker on the stage, for rooms made for games: every game, by kind.
+  $('#gamePickList').append(...CATEGORIES.map((c) => el('section', { class: 'game-pick-group' },
+    el('h3', {}, c.label),
+    el('ul', { class: 'g-grid' }, ...tiles(CATALOG.filter((g) => g.category === c.id))))));
+  const gamesRoom = () => getRoom()?.mode === 'games';
 
   async function open(type) {
     if (game?.type === type && !game.result) { toStage(); return; }
@@ -86,9 +93,22 @@ export function initGames({ socket, clientId, getRoom, now }) {
     if (matchMedia('(max-width: 979px)').matches) $('#stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   const showTab = () => $('#tabGamesBtn').click();
+  // "Pick another game": in a games room, back to the picker on the stage for everyone.
+  const another = () => (gamesRoom() ? ask('game:close') : showTab());
   $('#emptyPlay').addEventListener('click', () => { showTab(); $('#tabGames').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); });
 
+  let wasGamesRoom = false;
   function renderTabExtras(room) {
+    // A games room shows the picker on the stage when nothing is on, with the chat beside it.
+    const picking = room.mode === 'games' && !room.games?.open && !room.current;
+    $('#gamePick').hidden = !picking;
+    $('#stage').classList.toggle('is-picking', picking);
+    if (room.mode === 'games' && !wasGamesRoom) $('#tabChatBtn').click();
+    wasGamesRoom = room.mode === 'games';
+    $('#gamesHint').textContent = room.mode === 'games'
+      ? 'Pick a game and it opens for everyone, right on the main screen.'
+      : 'Pick a game and it opens for everyone, right where the video plays. The video pauses while you play.';
+
     const on = room.games?.open;
     const card = $('#gameNowCard');
     card.hidden = !on;
@@ -184,7 +204,7 @@ export function initGames({ socket, clientId, getRoom, now }) {
           ? el('button', { class: 'btn btn-primary', disabled: !enough, onclick: () => ask('game:start') }, 'Start')
           : el('button', { class: 'btn btn-primary', disabled: full, onclick: () => ask('game:seat', { on: true }) }, 'Join'),
         seated ? el('button', { class: 'btn btn-quiet', onclick: () => ask('game:seat', { on: false }) }, 'Leave seat') : null,
-        el('button', { class: 'btn btn-quiet', onclick: showTab }, 'Pick another game'))));
+        el('button', { class: 'btn btn-quiet', onclick: another }, 'Pick another game'))));
   }
 
   function renderResult() {
@@ -201,7 +221,7 @@ export function initGames({ socket, clientId, getRoom, now }) {
     foot.replaceChildren(line, el('div', { class: 'g-foot-actions' },
       isPlayer() ? el('button', { class: 'btn btn-primary btn-small', onclick: () => ask('game:again') }, 'Play again') : null,
       isPlayer() ? el('button', { class: 'btn btn-small', onclick: () => ask('game:lobby') }, 'Change players') : null,
-      el('button', { class: 'btn btn-quiet btn-small', onclick: showTab }, 'Another game')));
+      el('button', { class: 'btn btn-quiet btn-small', onclick: another }, 'Another game')));
   }
 
   // The time left in a timed round, counted on the shared clock.

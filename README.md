@@ -16,8 +16,8 @@ Watch together from different places, on computers and phones (and a TV browser 
 
 ## Rooms: names, private, and public
 
-- **Start a room** asks for an optional name and who can join. **Private** (the default) means only people with the code or link get in, and it never shows up anywhere. **Public** means it's listed in **Browse public rooms** (`/rooms`) while someone is in it, and anyone can join.
-- The person who starts a room is its **host** and changes its name and privacy from the room menu. If the host is away, whoever has been in the room longest stands in; the host gets it back on return.
+- **Start a room** asks what it's for (watching, or games), an optional name, and who can join. **Private** (the default) means only people with the code or link get in, and it never shows up anywhere. **Public** means it's listed in **Browse public rooms** (`/rooms`) while someone is in it, and anyone can join.
+- The person who starts a room is its **host** and changes its name, privacy, and whether it's for watching or games from the room menu. If the host is away, whoever has been in the room longest stands in; the host gets it back on return.
 - Browse public rooms shows live rooms, busiest first, with what's on and who's there, and searches room names, what's playing, and codes.
 - Trying lots of different room codes from one address is cut off after 30 in 10 minutes, so private rooms can't be found by guessing.
 
@@ -56,7 +56,7 @@ The free quota allows about 100 searches a day; results are cached for 10 minute
 
 ## Games
 
-The **Games** tab has 27 games everyone in the room plays together. Pick one and it opens for everyone where the video plays (the video pauses); people tap Join to take a seat, and anyone seated taps Start. The call, chat, and reactions stay on while you play.
+The **Games** tab has 27 games everyone in the room plays together. Rooms don't have to be about the video: start one for **Games** (or switch it from the room menu, as the host) and it opens to a game picker on the main screen, with the chat beside it, and comes back to the picker whenever a game closes. **Start a game night** on the home page does this in one step. You can still put a video on in a games room. Pick one and it opens for everyone where the video plays (the video pauses); people tap Join to take a seat, and anyone seated taps Start. The call, chat, and reactions stay on while you play.
 
 | Kind | Games |
 | --- | --- |

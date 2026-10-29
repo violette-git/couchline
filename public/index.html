@@ -80,6 +80,13 @@
             </form>
           </div>
           <form id="createForm" class="create-form" hidden>
+            <div class="field">What’s it for
+              <div class="seg seg-wide" role="group" aria-label="What the room is for">
+                <button type="button" data-mode="watch" aria-pressed="true">Watching</button>
+                <button type="button" data-mode="games" aria-pressed="false">Games</button>
+              </div>
+              <p id="createModeNote" class="note"></p>
+            </div>
             <label class="field"><span>Name your room <span class="optional">(optional)</span></span>
               <input id="createTitle" maxlength="60" placeholder="Friday movie night" autocomplete="off">
             </label>
@@ -239,6 +246,7 @@
           <h2 class="section-title">Game night, built in.</h2>
           <p class="section-lede">Between episodes, pick a game and it opens for everyone in the room, right where the video plays. The call stays on, so the trash talk is face to face. Couchline keeps score and keeps everyone honest: nobody can peek at a hidden word or someone else’s hand.</p>
           <div id="gameShelf" class="g-shelf"></div>
+          <p class="g-shelf-cta"><button type="button" class="btn btn-primary btn-lg" data-open-create="games">Start a game night <svg class="i" aria-hidden="true"><use href="#i-arrow"/></svg></button></p>
         </div>
       </section>
 
@@ -354,6 +362,10 @@
               <button type="button" data-room-visibility="public" aria-pressed="false">Public</button>
             </div>
             <p id="roomPrivacyNote" class="note"></p>
+            <div class="seg seg-wide" role="group" aria-label="What the room is for">
+              <button type="button" data-room-mode="watch" aria-pressed="true">Watching</button>
+              <button type="button" data-room-mode="games" aria-pressed="false">Games</button>
+            </div>
           </form>
           <p class="room-menu-label">Room code</p>
           <p id="roomMenuCode" class="room-menu-code"></p>
@@ -459,6 +471,15 @@
             <p id="extNote" class="hint ext-note" hidden></p>
             <p><a id="extGet" class="btn btn-small ext-room-link" href="/extension" hidden>Get the extension</a></p>
             <p><button id="becomeRemote" class="btn btn-small" hidden>Use this tab as a remote</button></p>
+          </div>
+
+          <div id="gamePick" class="game-pick" hidden>
+            <div class="game-pick-head">
+              <p class="empty-code">Room code <strong id="pickCode"></strong></p>
+              <h2 class="game-pick-title">Pick a game</h2>
+              <p class="hint">It opens for everyone here. Send the code, or tap Invite, to bring more people in.</p>
+            </div>
+            <div id="gamePickList" class="game-pick-list"></div>
           </div>
 
           <div id="gameWrap" class="game-wrap" hidden>
@@ -588,7 +609,7 @@
             <p id="gameNowText" class="swipe-title"></p>
             <button id="gameNowGo" class="btn btn-small">Go to it</button>
           </div>
-          <p class="hint">Pick a game and it opens for everyone, right where the video plays. The video pauses while you play.</p>
+          <p id="gamesHint" class="hint">Pick a game and it opens for everyone, right where the video plays. The video pauses while you play.</p>
           <div class="browse-search g-search" role="search">
             <label for="gameSearch" class="sr">Search games</label>
             <input id="gameSearch" type="search" placeholder="Search games" autocomplete="off">

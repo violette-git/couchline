@@ -120,6 +120,22 @@ assert.equal(b.game, null);
 assert.equal(b.last.games.open, null);
 check.ok('late joiners, people who leave, and ending a game');
 
+// Rooms made for games.
+assert.equal(a.last.mode, 'watch', 'rooms are for watching unless the host says otherwise');
+assert.match((await b.ask('room:settings', { mode: 'games' })).error, /Only/);
+assert.ok((await a.ask('room:settings', { mode: 'games' })).ok);
+await wait(50);
+assert.equal(b.last.mode, 'games');
+assert.ok(b.toasts.some((t) => t.includes('made this a games room')));
+const dir = await (await fetch(`http://localhost:${PORT}/api/rooms?q=games-room`)).json();
+assert.equal(dir.rooms[0].mode, 'games');
+const e = games(client(PORT, 'Eve', 'games-room-2', { cache: { mode: 'games', title: 'Game night' } }));
+await e.joined;
+await wait(50);
+assert.equal(e.last.mode, 'games', 'a room restored after a restart stays a games room');
+e.disconnect();
+check.ok('the host makes a room a games room; it shows in public rooms and survives a restart');
+
 for (const s of [a, b, c]) s.disconnect();
 srv.kill();
 console.log(`\n${check.count} game room checks passed\n`);
